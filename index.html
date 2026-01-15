@@ -1,0 +1,3175 @@
+<!doctype html>
+<html lang="en" style="scroll-behavior: smooth;">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scorecard Playground</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #111935;
+      --panel2: #0f1730;
+      --text: #e9eefc;
+      --muted: #a9b4d6;
+      --border: rgba(255,255,255,.10);
+      --good: #6ee7b7;
+      --warn: #fde68a;
+      --bad: #fb7185;
+      --accent: #93c5fd;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: radial-gradient(1200px 600px at 10% 10%, rgba(147,197,253,.14), transparent),
+                  radial-gradient(1000px 600px at 90% 20%, rgba(110,231,183,.10), transparent),
+                  var(--bg);
+      color: var(--text);
+    }
+
+    .page-layout {
+      display: flex;
+      gap: 0;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      width: 220px;
+      flex-shrink: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      border-right: 1px solid var(--border);
+      padding: 24px 16px;
+    }
+
+    .sidebar-main-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 0 0 24px;
+      color: var(--text);
+      letter-spacing: .2px;
+    }
+
+    .sidebar-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--muted);
+      margin: 0 0 14px;
+    }
+
+    /* Stacked bar visualization */
+    .stacked-bar {
+      display: flex;
+      height: 32px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(0,0,0,.3);
+      border: 1px solid var(--border);
+    }
+
+    .stacked-segment {
+      position: relative;
+      min-width: 0;
+      transition: flex .3s ease;
+      overflow: hidden;
+    }
+
+    .stacked-segment .segment-fill {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 0%;
+      transition: width .3s ease;
+    }
+
+    .slo-segment { background: rgba(147,197,253,.25); }
+    .slo-segment .segment-fill { background: #93c5fd; }
+    
+    .vuln-segment { background: rgba(251,113,133,.25); }
+    .vuln-segment .segment-fill { background: #fb7185; }
+    
+    .bugs-segment { background: rgba(253,224,138,.25); }
+    .bugs-segment .segment-fill { background: #fde68a; }
+
+
+
+    /* Score summary */
+    .score-summary {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .grade-badge {
+      font-size: 28px;
+      font-weight: 800;
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      letter-spacing: -1px;
+    }
+
+    .grade-A { background: rgba(110,231,183,.18); color: #6ee7b7; border: 1px solid rgba(110,231,183,.3); }
+    .grade-B { background: rgba(147,197,253,.18); color: #93c5fd; border: 1px solid rgba(147,197,253,.3); }
+    .grade-C { background: rgba(253,230,138,.18); color: #fde68a; border: 1px solid rgba(253,230,138,.3); }
+    .grade-D { background: rgba(251,113,133,.18); color: #fb7185; border: 1px solid rgba(251,113,133,.3); }
+    .grade-F { background: rgba(239,68,68,.18); color: #ef4444; border: 1px solid rgba(239,68,68,.3); }
+
+    .score-total {
+      text-align: center;
+      font-family: var(--mono);
+    }
+
+    .score-earned {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .score-max {
+      font-size: 16px;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    .score-pct {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    /* Category rows */
+    .category-row {
+      display: block;
+      text-decoration: none;
+      padding: 12px;
+      margin: 0 -12px;
+      border-radius: 10px;
+      transition: background .15s;
+    }
+
+    .category-row:hover {
+      background: rgba(255,255,255,.06);
+    }
+
+    .category-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .category-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .category-dot.slo { background: #93c5fd; }
+    .category-dot.vuln { background: #fb7185; }
+    .category-dot.bugs { background: #fde68a; }
+
+    .category-name {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .category-pct {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .category-pct.good { color: var(--good); }
+    .category-pct.warn { color: var(--warn); }
+    .category-pct.bad { color: var(--bad); }
+
+    .category-score {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      padding-left: 16px;
+    }
+
+    .category-bar {
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255,255,255,.08);
+      overflow: hidden;
+      margin-left: 16px;
+    }
+
+    .category-bar > div {
+      height: 100%;
+      border-radius: 3px;
+      transition: width .3s ease;
+    }
+
+    .category-bar.good > div { background: var(--good); }
+    .category-bar.warn > div { background: var(--warn); }
+    .category-bar.bad > div { background: var(--bad); }
+
+    .wrap {
+      flex: 1;
+      min-width: 0;
+      max-width: 1100px;
+      padding: 24px 32px 60px;
+    }
+
+    @media (max-width: 900px) {
+      .page-layout {
+        flex-direction: column;
+      }
+      .sidebar {
+        position: static;
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 16px;
+      }
+      .wrap {
+        padding: 24px 18px 60px;
+      }
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: .2px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 13px;
+      max-width: 66ch;
+      line-height: 1.4;
+      margin-top: 6px;
+    }
+
+    .grid {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.30);
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: .2px;
+      text-transform: uppercase;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    label {
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    input[type="text"], input[type="number"], select {
+      background: rgba(0,0,0,.22);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 10px;
+      outline: none;
+    }
+
+    input[type="number"] { width: 88px; }
+    input[type="text"] { width: 160px; }
+    select { padding: 8px 10px; }
+
+    input[type="range"] { width: 220px; }
+
+    .btn {
+      background: rgba(147,197,253,.16);
+      border: 1px solid rgba(147,197,253,.35);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: .2px;
+      transition: transform .05s ease;
+    }
+    .btn:active { transform: translateY(1px); }
+
+    .btn.secondary {
+      background: rgba(255,255,255,.06);
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .btn.danger {
+      background: rgba(251,113,133,.14);
+      border-color: rgba(251,113,133,.35);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    thead th {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: left;
+      padding: 10px 8px;
+      background: rgba(0,0,0,.18);
+      border-bottom: 1px solid var(--border);
+    }
+    tbody td {
+      padding: 10px 8px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      vertical-align: middle;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody input[type="text"] { width: 140px; }
+    tbody input[type="number"] { width: 80px; }
+    tbody select { width: 86px; }
+
+
+    .aggregate-viz {
+      margin-top: 14px;
+      background: rgba(0,0,0,.18);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .agg-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .agg-header .title {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: .3px;
+    }
+    .formula-inline {
+      font-size: 11px;
+      color: var(--accent);
+    }
+    .agg-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .agg-table th {
+      text-align: left;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .3px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+    .agg-table th.right {
+      text-align: right;
+    }
+    .agg-table td {
+      padding: 10px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .agg-table td.mono {
+      font-family: var(--mono);
+    }
+    .agg-table td.right {
+      text-align: right;
+    }
+    .agg-table tr:last-child td {
+      border-bottom: none;
+    }
+    .agg-table tfoot td {
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      font-weight: 600;
+    }
+    .muted { color: var(--muted); }
+    .mono { font-family: var(--mono); }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0 0 14px 0;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .config-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .config-label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: .2px;
+    }
+
+    .method-params {
+      margin-top: 14px;
+      background: rgba(0,0,0,.18);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .method-params .param-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .method-params .param-row:last-child {
+      margin-bottom: 0;
+    }
+    .method-params .param-label {
+      min-width: 120px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .method-params .formula-display {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+    }
+    .method-params .example-display {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .chart-container {
+      background: rgba(0,0,0,.18);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .intro-box {
+      background: linear-gradient(135deg, rgba(147,197,253,.08), rgba(110,231,183,.05));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px 22px;
+      margin-bottom: 14px;
+      line-height: 1.55;
+    }
+    .intro-box h3 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .intro-box h4 {
+      margin: 16px 0 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .2px;
+    }
+    .intro-box p {
+      margin: 0 0 12px;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .intro-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .intro-box li {
+      margin-bottom: 10px;
+    }
+    .intro-box li:last-child {
+      margin-bottom: 0;
+    }
+    .intro-box strong {
+      color: var(--accent);
+    }
+    .intro-box em {
+      color: var(--good);
+      font-style: normal;
+    }
+
+    .pill {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.18);
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .kpi {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .kpi .box {
+      background: rgba(0,0,0,.18);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 12px;
+    }
+    .kpi .box .label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    .kpi .box .value {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: .2px;
+    }
+
+    .bar {
+      height: 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.10);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .bar > div {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, rgba(110,231,183,.9), rgba(147,197,253,.9));
+      transition: width .15s ease;
+    }
+
+    .note {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .formula {
+      margin-top: 10px;
+      background: rgba(0,0,0,.22);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: #dbeafe;
+      line-height: 1.5;
+      overflow: auto;
+      white-space: pre;
+    }
+
+    .small { font-size: 12px; color: var(--muted); }
+
+    /* Welcome Hero */
+    .welcome-hero {
+      background: linear-gradient(135deg, rgba(147,197,253,.12) 0%, rgba(110,231,183,.08) 50%, rgba(196,181,253,.10) 100%);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px 36px;
+      margin-bottom: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .welcome-hero::before {
+      content: "";
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(147,197,253,.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .welcome-badge {
+      display: inline-block;
+      background: rgba(147,197,253,.18);
+      border: 1px solid rgba(147,197,253,.35);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      margin-bottom: 16px;
+    }
+
+    .welcome-title {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text);
+      margin: 0 0 12px;
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+    }
+
+    .welcome-desc {
+      font-size: 15px;
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 600px;
+      margin: 0 0 24px;
+    }
+
+    .welcome-features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .welcome-feature {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      background: rgba(0,0,0,.18);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      transition: transform .15s ease, border-color .15s ease;
+    }
+
+    .welcome-feature:hover {
+      transform: translateY(-2px);
+      border-color: rgba(147,197,253,.3);
+    }
+
+    .feature-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,.06);
+      border-radius: 10px;
+    }
+
+    .feature-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .feature-text strong {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .feature-text span {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .welcome-hint {
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hint-arrow {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      background: rgba(110,231,183,.15);
+      border-radius: 50%;
+      color: var(--good);
+      font-size: 14px;
+      animation: bounce 2s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(4px); }
+      60% { transform: translateY(2px); }
+    }
+
+    .welcome-video {
+      margin: 24px 0;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 10px 40px rgba(0,0,0,.4);
+      position: relative;
+      padding-bottom: 56.25%; /* 16:9 aspect ratio */
+      height: 0;
+      max-width: 640px;
+    }
+
+    .welcome-video iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 12px;
+    }
+
+    @media (max-width: 600px) {
+      .welcome-hero {
+        padding: 24px 20px;
+      }
+      .welcome-title {
+        font-size: 22px;
+      }
+      .welcome-features {
+        grid-template-columns: 1fr;
+      }
+      .welcome-video {
+        margin: 20px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <h1 class="sidebar-main-title">Scorecard Playground</h1>
+
+      <!-- Overall Score Summary -->
+      <div class="score-summary">
+        <div class="grade-badge grade-B" id="gradeBadge">B</div>
+        <div class="score-total">
+          <span class="score-earned" id="sidebarTotalScore">—</span>
+          <span class="score-max"> / <span id="sidebarTotalMax">60</span></span>
+        </div>
+        <div class="stacked-bar">
+          <div class="stacked-segment slo-segment" id="stackedSloSegment">
+            <div class="segment-fill" id="stackedSloFill"></div>
+          </div>
+          <div class="stacked-segment vuln-segment" id="stackedVulnSegment">
+            <div class="segment-fill" id="stackedVulnFill"></div>
+          </div>
+          <div class="stacked-segment bugs-segment" id="stackedBugsSegment">
+            <div class="segment-fill" id="stackedBugsFill"></div>
+          </div>
+          <div class="stacked-segment" id="stackedPmSegment" style="background: rgba(196,181,253,.25);">
+            <div class="segment-fill" id="stackedPmFill" style="background: #c4b5fd;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category Breakdown -->
+      <a href="#section-slos" class="category-row" id="categorySlo">
+        <div class="category-header">
+          <span class="category-dot slo"></span>
+          <span class="category-name">SLOs</span>
+          <span class="category-pct" id="sidebarSloPct">—%</span>
+        </div>
+        <div class="category-score" id="sidebarSloScore">— / —</div>
+        <div class="category-bar" id="sidebarSloBar"><div></div></div>
+      </a>
+
+      <a href="#section-vulns" class="category-row" id="categoryVuln">
+        <div class="category-header">
+          <span class="category-dot vuln"></span>
+          <span class="category-name">Vulns</span>
+          <span class="category-pct" id="sidebarVulnPct">—%</span>
+        </div>
+        <div class="category-score" id="sidebarVulnScore">— / —</div>
+        <div class="category-bar" id="sidebarVulnBar"><div></div></div>
+      </a>
+
+      <a href="#section-bugs" class="category-row" id="categoryBugs">
+        <div class="category-header">
+          <span class="category-dot bugs"></span>
+          <span class="category-name">Bugs</span>
+          <span class="category-pct" id="sidebarBugsPct">—%</span>
+        </div>
+        <div class="category-score" id="sidebarBugsScore">— / —</div>
+        <div class="category-bar" id="sidebarBugsBar"><div></div></div>
+      </a>
+
+      <a href="#section-postmortems" class="category-row" id="categoryPm">
+        <div class="category-header">
+          <span class="category-dot" style="background: #c4b5fd;"></span>
+          <span class="category-name">Postmortems</span>
+          <span class="category-pct" id="sidebarPmPct">—%</span>
+        </div>
+        <div class="category-score" id="sidebarPmScore">— / —</div>
+        <div class="category-bar" id="sidebarPmBar"><div></div></div>
+      </a>
+    </aside>
+
+    <!-- Main content -->
+    <div class="wrap">
+      <!-- Welcome Introduction -->
+      <div class="welcome-hero">
+        <div class="welcome-badge">✦ Interactive Playground</div>
+        <h1 class="welcome-title">Design your team's health scorecard</h1>
+        <p class="welcome-desc">
+          This playground lets you experiment with different scoring models for measuring team and service health. 
+          Adjust weights, thresholds, and normalization methods to see how they affect final scores in real-time.
+        </p>
+        
+        <div class="welcome-video">
+          <iframe 
+            width="560" 
+            height="315" 
+            src="https://www.youtube.com/embed/605fxputDxM?rel=0&modestbranding=1" 
+            title="Scorecard Playground Introduction" 
+            frameborder="0" 
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allowfullscreen>
+          </iframe>
+        </div>
+
+        <div class="welcome-features">
+          <div class="welcome-feature">
+            <span class="feature-icon">⚡</span>
+            <div class="feature-text">
+              <strong>Live calculations</strong>
+              <span>See scores update instantly as you tweak inputs</span>
+            </div>
+          </div>
+          <div class="welcome-feature">
+            <span class="feature-icon">🎛️</span>
+            <div class="feature-text">
+              <strong>Configurable weights</strong>
+              <span>Prioritize what matters most to your team</span>
+            </div>
+          </div>
+          <div class="welcome-feature">
+            <span class="feature-icon">📊</span>
+            <div class="feature-text">
+              <strong>Multiple categories</strong>
+              <span>SLOs, vulnerabilities, bugs, and postmortems</span>
+            </div>
+          </div>
+          <div class="welcome-feature">
+            <span class="feature-icon">💾</span>
+            <div class="feature-text">
+              <strong>Auto-saved state</strong>
+              <span>Your experiments persist across sessions</span>
+            </div>
+          </div>
+        </div>
+        <p class="welcome-hint">
+          <span class="hint-arrow">↓</span> Scroll down to explore each scoring category, or use the sidebar to jump to a specific section.
+        </p>
+      </div>
+
+      <h2 class="section-title" id="section-slos">SLOs</h2>
+
+    <div class="intro-box">
+      <h3>Score design</h3>
+      <p>
+        A <em>Service Level Objective (SLO)</em> defines a target for how reliably a service should perform—for example, 
+        "99.9% of requests complete successfully." The <em>error budget</em> is the allowed margin for failure: 
+        if your target is 99.9%, you have a 0.1% error budget.
+      </p>
+      <p>
+        <strong>Error budget remaining (EB%)</strong> tells you how much of that budget you've used. 
+        100% means you haven't used any budget (perfect reliability). 
+        0% means you've exhausted your budget (too many failures).
+      </p>
+      
+      <h4>Key design decisions</h4>
+      <ul>
+        <li>
+          <strong>Normalization is straightforward.</strong>
+          Since EB% is already a percentage (0–100), we simply divide by 100 to get a 0–1 score. 
+          No complex normalization needed.
+        </li>
+        <li>
+          <strong>Weight by tier.</strong>
+          SLOs are assigned tiers (p0, p1, p2) reflecting their importance. 
+          A p0 (critical) SLO with low error budget remaining drags the score down more than a p2.
+        </li>
+        <li>
+          <strong>Weighted average.</strong>
+          The final score S is a weighted average: S = Σ(wᵢ·sᵢ) / Σ(wᵢ), 
+          where each SLO contributes proportionally to its weight.
+        </li>
+      </ul>
+      
+      <p class="muted" style="margin-bottom: 0;">
+        Adjust tier weights and SLO inputs below to see how they affect the final score.
+      </p>
+    </div>
+
+    <div class="grid">
+      <!-- Configuration -->
+      <div class="card">
+        <h2>Configuration</h2>
+
+        <div class="config-group">
+          <div class="config-label">Tier weights</div>
+          <div class="row">
+            <label>p0 <input id="wP0" type="number" step="0.1" value="2.0" /></label>
+            <label>p1 <input id="wP1" type="number" step="0.1" value="1.0" /></label>
+            <label>p2 <input id="wP2" type="number" step="0.1" value="0.5" /></label>
+          </div>
+          </div>
+
+        <div class="config-group" style="margin-top: 14px;">
+          <div class="config-label">Score budget</div>
+          <div class="row">
+            <input id="pointBudget" type="number" min="0" max="100" step="1" value="20" style="width: 80px;" />
+            <span class="muted">/100 (global)</span>
+          </div>
+        </div>
+        </div>
+
+      <!-- SLO Inputs -->
+      <div class="card">
+        <h2>Inputs</h2>
+
+          <table>
+            <thead>
+              <tr>
+                <th>SLO</th>
+                <th>Tier</th>
+                <th>EB%</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="sloTbody"></tbody>
+          </table>
+
+        <div class="row" style="justify-content: flex-end; margin-top: 12px;">
+          <button class="btn" id="addSlo">+ Add SLO</button>
+        </div>
+      </div>
+
+      <!-- Results + visualization -->
+      <div class="card">
+        <h2>Results</h2>
+
+        <div class="kpi">
+          <div class="box">
+            <div class="label">Weighted average <span class="mono">S</span> (0..1)</div>
+            <div class="value mono" id="scoreS">0.0000</div>
+            <div class="bar" style="margin-top: 10px;"><div id="scoreBar"></div></div>
+          </div>
+          <div class="box">
+            <div class="label">Score (0..<span id="pointsMax">20</span>)</div>
+            <div class="value mono" id="points">0.00</div>
+            <div class="small muted" id="pointsNote"></div>
+          </div>
+        </div>
+
+        <div class="aggregate-viz">
+          <div class="agg-header">
+            <span class="title">Weighted aggregate</span>
+            <span class="formula-inline mono">S = Σ(wᵢ·sᵢ) / Σ(wᵢ)</span>
+          </div>
+          <table class="agg-table" id="aggTable">
+            <thead></thead>
+            <tbody></tbody>
+            <tfoot></tfoot>
+          </table>
+        </div>
+
+        <div class="formula" id="formulaBox"></div>
+
+        <div class="note">
+          Tip: Try adding a low-EB SLO with a high weight (tier p0) to see how it drags the team score down.
+        </div>
+      </div>
+        </div>
+
+      <!-- ========== CONTAINER VULNS SECTION ========== -->
+      <h2 class="section-title" id="section-vulns" style="margin-top: 32px;">Container Vulns</h2>
+
+    <div class="intro-box">
+      <h3>Score design</h3>
+      <p>
+        Container vulnerabilities are counted by severity: <strong>Critical</strong>, <strong>High</strong>, 
+        <strong>Medium</strong>, and <strong>Low</strong>. Unlike SLO error budgets (which are already percentages), 
+        vulnerability counts are unbounded numbers that need to be <em>normalized</em> into a 0–1 score.
+      </p>
+      
+      <h4>Key design decisions</h4>
+      <ul>
+        <li>
+          <strong>Aggregate by severity, not by image.</strong> 
+          We sum all critical vulns across all images, all highs across all images, etc. 
+          This ensures that 100 critical vulns has massive impact regardless of how they're distributed across images.
+        </li>
+        <li>
+          <strong>Weight by severity.</strong>
+          Critical vulns are weighted more heavily than low vulns (default: Critical=4, High=2, Medium=1, Low=0.5).
+          This reflects the real-world urgency of different severity levels.
+        </li>
+        <li>
+          <strong>Choose a normalization method.</strong>
+          Different methods have different characteristics—exponential decay is smooth, 
+          linear threshold has a hard cutoff, etc. The right choice depends on how you want to model urgency.
+        </li>
+      </ul>
+
+      <h4>Recommendation: Exponential decay (λ = 0.85)</h4>
+      <p>
+        We recommend <strong>exponential decay</strong> with a decay rate of <strong>0.85</strong> for normalizing vulnerability counts. 
+        This means each additional vulnerability multiplies your score by 0.85 (a 15% reduction per vuln).
+      </p>
+      <p><strong>Why this method?</strong></p>
+      <ul>
+        <li>
+          <strong>Diminishing returns.</strong> The first vulnerability hurts most (1.0 → 0.85). 
+          Going from 10 → 11 vulns matters less (0.20 → 0.17). This reflects reality: 
+          a team with zero vulns slipping to one is a bigger deal than 50 → 51.
+        </li>
+        <li>
+          <strong>Never reaches zero.</strong> Even with many vulnerabilities, the score asymptotically 
+          approaches zero but never quite gets there. This avoids the "give up" effect of hard cutoffs.
+        </li>
+        <li>
+          <strong>Intuitive and explainable.</strong> "Each vulnerability reduces your score by 15%" 
+          is easy to communicate to teams.
+        </li>
+        <li>
+          <strong>Smooth curve.</strong> No arbitrary thresholds or discontinuities that could 
+          feel unfair or gameable.
+        </li>
+      </ul>
+      <p class="muted" style="margin-top: 8px;">
+        With λ = 0.85: 0 vulns → 1.00, 1 → 0.85, 3 → 0.61, 5 → 0.44, 10 → 0.20, 20 → 0.04
+      </p>
+      
+      <p class="muted" style="margin-bottom: 0;">
+        Use the controls below to experiment with different methods and parameters.
+      </p>
+    </div>
+
+    <div class="grid">
+      <!-- Configuration -->
+      <div class="card">
+        <h2>Configuration</h2>
+
+        <div class="config-group">
+          <div class="config-label">Severity weights</div>
+          <div class="row">
+            <label>Critical <input id="vulnWCritical" type="number" step="0.1" value="4.0" /></label>
+            <label>High <input id="vulnWHigh" type="number" step="0.1" value="2.0" /></label>
+            <label>Medium <input id="vulnWMedium" type="number" step="0.1" value="1.0" /></label>
+            <label>Low <input id="vulnWLow" type="number" step="0.1" value="0.5" /></label>
+          </div>
+          </div>
+
+        <div class="config-group" style="margin-top: 14px;">
+          <div class="config-label">Score budget</div>
+          <div class="row">
+            <input id="vulnBudget" type="number" min="0" max="100" step="1" value="20" style="width: 80px;" />
+            <span class="muted">/100 (global)</span>
+        </div>
+      </div>
+
+        <div class="config-group" style="margin-top: 14px;">
+          <div class="config-label">Normalization method</div>
+          <select id="vulnMethod" style="width: 100%; max-width: 300px;">
+            <option value="exponential">Exponential decay</option>
+            <option value="linear">Linear threshold</option>
+            <option value="inverse">Inverse (hyperbolic)</option>
+            <option value="logarithmic">Logarithmic</option>
+            <option value="sigmoid">Sigmoid (S-curve)</option>
+            <option value="bucket">Bucket / Step function</option>
+          </select>
+        </div>
+
+        <div class="method-params" id="vulnMethodParams">
+          <!-- Dynamically populated based on selected method -->
+        </div>
+
+        <div class="chart-container" style="margin-top: 14px;">
+          <div class="config-label" style="margin-bottom: 8px;">Normalization curve</div>
+          <div style="position: relative; height: 200px;">
+            <canvas id="vulnChart"></canvas>
+          </div>
+          <div class="row" style="margin-top: 8px; gap: 8px;">
+            <label style="font-size: 12px;">
+              <input type="checkbox" id="vulnShowAllMethods" /> Show all methods
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inputs -->
+      <div class="card">
+        <h2>Inputs</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Image</th>
+              <th>Critical</th>
+              <th>High</th>
+              <th>Medium</th>
+              <th>Low</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="vulnTbody"></tbody>
+        </table>
+
+        <div class="row" style="justify-content: flex-end; margin-top: 12px;">
+          <button class="btn" id="addVuln">+ Add Image</button>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="card">
+        <h2>Results</h2>
+
+        <div class="kpi">
+          <div class="box">
+            <div class="label">Weighted average <span class="mono">S</span> (0..1)</div>
+            <div class="value mono" id="vulnScoreS">0.0000</div>
+            <div class="bar" style="margin-top: 10px;"><div id="vulnScoreBar"></div></div>
+          </div>
+          <div class="box">
+            <div class="label">Score (0..<span id="vulnScoreMax">20</span>)</div>
+            <div class="value mono" id="vulnScore">0.00</div>
+            <div class="small muted" id="vulnScoreNote"></div>
+          </div>
+        </div>
+
+        <div class="aggregate-viz">
+          <div class="agg-header">
+            <span class="title">Weighted aggregate</span>
+            <span class="formula-inline mono">S = Σ(wᵢ·sᵢ) / Σ(wᵢ)</span>
+          </div>
+          <table class="agg-table" id="vulnAggTable">
+            <thead></thead>
+            <tbody></tbody>
+            <tfoot></tfoot>
+          </table>
+        </div>
+
+        <div class="formula" id="vulnFormulaBox"></div>
+      </div>
+    </div>
+
+      <!-- ========== BUG REPORTS SECTION ========== -->
+      <h2 class="section-title" id="section-bugs" style="margin-top: 32px;">Bug Reports</h2>
+
+    <div class="intro-box">
+      <h3>Score design</h3>
+      <p>
+        Bug reports are categorized by priority: <strong>P0</strong> (critical/outage), <strong>P1</strong> (high impact), 
+        and <strong>P2</strong> (moderate). Like container vulnerabilities, bug counts are unbounded numbers 
+        that need to be <em>normalized</em> into a 0–1 score.
+      </p>
+      
+      <h4>Key design decisions</h4>
+      <ul>
+        <li>
+          <strong>Simple totals.</strong> 
+          We count total bugs per priority level across the entire service. 
+          No need to break down by product or component.
+        </li>
+        <li>
+          <strong>Weight by priority.</strong>
+          P0 bugs are weighted most heavily (default: P0=4, P1=2, P2=1).
+          A single P0 outage bug should hurt more than several P2 polish issues.
+        </li>
+      </ul>
+
+      <h4>Recommendation: Exponential decay (λ = 0.85)</h4>
+      <p>
+        Following the same rationale as container vulnerabilities, we recommend <strong>exponential decay</strong> 
+        with a decay rate of <strong>0.85</strong>. Each additional bug reduces the score by 15%.
+      </p>
+      <p class="muted" style="margin-bottom: 0;">
+        With λ = 0.85: 0 bugs → 1.00, 1 → 0.85, 3 → 0.61, 5 → 0.44, 10 → 0.20
+      </p>
+    </div>
+
+    <div class="grid">
+      <!-- Configuration -->
+      <div class="card">
+        <h2>Configuration</h2>
+
+        <div class="config-group">
+          <span class="config-label">Priority weights</span>
+          <div class="row">
+            <label>P0 <input type="number" id="bugWP0" step="0.5" min="0" value="4" style="width:60px"></label>
+            <label>P1 <input type="number" id="bugWP1" step="0.5" min="0" value="2" style="width:60px"></label>
+            <label>P2 <input type="number" id="bugWP2" step="0.5" min="0" value="1" style="width:60px"></label>
+          </div>
+        </div>
+
+        <div class="config-group">
+          <span class="config-label">Score budget</span>
+          <input type="number" id="bugBudget" min="1" step="1" value="20" style="width:70px">
+        </div>
+
+        <div class="config-group">
+          <span class="config-label">Decay rate (λ)</span>
+          <div class="row">
+            <input type="number" id="bugDecay" step="0.05" min="0.1" max="0.99" value="0.85" style="width:70px">
+            <span class="muted" style="font-size: 12px;">Each bug multiplies score by this value</span>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="chart-container" style="margin-top: 14px;">
+          <canvas id="bugChart" height="140"></canvas>
+        </div>
+      </div>
+
+      <!-- Inputs -->
+      <div class="card">
+        <h2>Inputs</h2>
+        <p class="muted" style="font-size: 12px; margin: 0 0 10px;">Enter the total count of open bugs by priority.</p>
+        
+        <div class="row" style="gap: 16px;">
+          <label style="flex-direction: column; align-items: flex-start; gap: 4px;">
+            <span>P0 bugs</span>
+            <input type="number" id="bugCountP0" min="0" step="1" value="1" style="width: 80px;">
+          </label>
+          <label style="flex-direction: column; align-items: flex-start; gap: 4px;">
+            <span>P1 bugs</span>
+            <input type="number" id="bugCountP1" min="0" step="1" value="3" style="width: 80px;">
+          </label>
+          <label style="flex-direction: column; align-items: flex-start; gap: 4px;">
+            <span>P2 bugs</span>
+            <input type="number" id="bugCountP2" min="0" step="1" value="8" style="width: 80px;">
+          </label>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="card">
+        <h2>Results</h2>
+
+        <div class="kpi">
+          <div class="box">
+            <div class="label">Weighted average <span class="mono">S</span> (0..1)</div>
+            <div class="value mono" id="bugScoreS">0.0000</div>
+            <div class="bar" style="margin-top: 10px;"><div id="bugScoreBar"></div></div>
+          </div>
+          <div class="box">
+            <div class="label">Score (0..<span id="bugScoreMax">20</span>)</div>
+            <div class="value mono" id="bugScore">0.00</div>
+            <div class="small muted" id="bugScoreNote"></div>
+          </div>
+        </div>
+
+        <div class="aggregate-viz" style="margin-top: 14px;">
+          <h3 style="font-size: 13px; margin: 0 0 8px; color: var(--muted);">Weighted aggregate</h3>
+          <table class="agg-table" id="bugAggTable">
+            <thead></thead>
+            <tbody></tbody>
+            <tfoot></tfoot>
+          </table>
+        </div>
+
+        <div class="formula" id="bugFormulaBox"></div>
+      </div>
+    </div>
+
+      <!-- ========== POSTMORTEMS SECTION ========== -->
+      <h2 class="section-title" id="section-postmortems" style="margin-top: 32px;">Postmortems</h2>
+
+    <div class="intro-box">
+      <h3>Score design</h3>
+      <p>
+        Postmortem quality is measured across three problem types: <strong>Incomplete postmortem</strong> (most critical), 
+        <strong>Incomplete action items</strong>, and <strong>Missing metadata</strong> (least critical). 
+        Unlike per-incident tracking, this score answers: <em>"How is this team doing on postmortem hygiene overall?"</em>
+      </p>
+      
+      <h4>Key design decisions</h4>
+      <ul>
+        <li>
+          <strong>Input per-incident, score globally.</strong> 
+          You enter problems for each incident (natural for users), but we aggregate across all incidents 
+          to measure team-wide hygiene. This treats postmortem problems as a backlog to burn down.
+        </li>
+        <li>
+          <strong>Weight by both severity and problem type.</strong>
+          A Sev1 incomplete postmortem is more urgent than a Sev4 missing metadata. 
+          We use multiplicative weighting: weighted_count = Σ(severity_weight × problem_count).
+        </li>
+        <li>
+          <strong>Exponential decay normalization.</strong>
+          Each weighted problem unit reduces the type score by 15% (λ = 0.85). 
+          This means: 0 problems → 1.0, but accumulating problems exponentially hurts the score.
+        </li>
+        <li>
+          <strong>Weighted average across types.</strong>
+          The final score is a weighted average of the three problem type scores, 
+          with incomplete postmortems weighted most heavily.
+        </li>
+      </ul>
+      
+      <h4>Example calculation</h4>
+      <p class="muted" style="margin-bottom: 0;">
+        <strong>Incident 1 (Sev1):</strong> 1 incomplete action item → contributes 4 to actions total<br>
+        <strong>Incident 2 (Sev3):</strong> 2 metadata, 1 postmortem → contributes 2 to metadata, 1 to postmortem<br>
+        <strong>Incident 3 (Sev2):</strong> 1 metadata, 1 action → contributes 2 to metadata, 2 to actions<br><br>
+        Weighted totals: metadata=4, actions=6, postmortem=1<br>
+        Type scores (λ=0.85): metadata=0.52, actions=0.38, postmortem=0.85<br>
+        Final S = (1×0.52 + 2×0.38 + 3×0.85) / (1+2+3) = 0.64
+      </p>
+    </div>
+
+    <div class="grid">
+      <!-- Configuration -->
+      <div class="card">
+        <h2>Configuration</h2>
+
+        <div class="config-group">
+          <span class="config-label">Severity weights</span>
+          <div class="row">
+            <label>Sev1 <input type="number" id="pmWSev1" step="0.5" min="0" value="4" style="width:60px"></label>
+            <label>Sev2 <input type="number" id="pmWSev2" step="0.5" min="0" value="2" style="width:60px"></label>
+            <label>Sev3 <input type="number" id="pmWSev3" step="0.5" min="0" value="1" style="width:60px"></label>
+            <label>Sev4 <input type="number" id="pmWSev4" step="0.5" min="0" value="0.5" style="width:60px"></label>
+          </div>
+        </div>
+
+        <div class="config-group" style="margin-top: 14px;">
+          <span class="config-label">Problem type weights</span>
+          <div class="row">
+            <label>Incomplete postmortem <input type="number" id="pmWPostmortem" step="0.5" min="0" value="3" style="width:60px"></label>
+            <label>Incomplete actions <input type="number" id="pmWActions" step="0.5" min="0" value="2" style="width:60px"></label>
+            <label>Missing metadata <input type="number" id="pmWMetadata" step="0.5" min="0" value="1" style="width:60px"></label>
+          </div>
+        </div>
+
+        <div class="config-group" style="margin-top: 14px;">
+          <span class="config-label">Score budget</span>
+          <input type="number" id="pmBudget" min="1" step="1" value="20" style="width:70px">
+        </div>
+
+        <div class="config-group" style="margin-top: 14px;">
+          <span class="config-label">Decay rate (λ)</span>
+          <div class="row">
+            <input type="number" id="pmDecay" step="0.05" min="0.1" max="0.99" value="0.85" style="width:70px">
+            <span class="muted" style="font-size: 12px;">Each weighted problem unit multiplies score by this</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inputs -->
+      <div class="card">
+        <h2>Inputs</h2>
+        <p class="muted" style="font-size: 12px; margin: 0 0 10px;">Enter incidents with their problem counts. Scoring aggregates across all incidents.</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Incident</th>
+              <th>Severity</th>
+              <th>Missing<br>metadata</th>
+              <th>Incomplete<br>actions</th>
+              <th>Incomplete<br>postmortem</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="pmTbody"></tbody>
+        </table>
+
+        <div class="row" style="justify-content: flex-end; margin-top: 12px;">
+          <button class="btn" id="addPm">+ Add Incident</button>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="card">
+        <h2>Results</h2>
+
+        <div class="kpi">
+          <div class="box">
+            <div class="label">Weighted average <span class="mono">S</span> (0..1)</div>
+            <div class="value mono" id="pmScoreS">0.0000</div>
+            <div class="bar" style="margin-top: 10px;"><div id="pmScoreBar"></div></div>
+          </div>
+          <div class="box">
+            <div class="label">Score (0..<span id="pmScoreMax">20</span>)</div>
+            <div class="value mono" id="pmScore">0.00</div>
+            <div class="small muted" id="pmScoreNote"></div>
+          </div>
+        </div>
+
+        <div class="aggregate-viz" style="margin-top: 14px;">
+          <h3 style="font-size: 13px; margin: 0 0 8px; color: var(--muted);">Weighted aggregate by problem type</h3>
+          <table class="agg-table" id="pmAggTable">
+            <thead></thead>
+            <tbody></tbody>
+            <tfoot></tfoot>
+          </table>
+        </div>
+
+        <div class="formula" id="pmFormulaBox"></div>
+      </div>
+    </div>
+    </div><!-- /wrap -->
+  </div><!-- /page-layout -->
+
+<script>
+  // ---------- Helpers ----------
+  const clamp = (x, a=0, b=1) => Math.min(b, Math.max(a, x));
+  const fmt = (x, d=4) => Number.isFinite(x) ? x.toFixed(d) : "NaN";
+  const fmt2 = (x) => Number.isFinite(x) ? x.toFixed(2) : "NaN";
+
+  // ---------- LocalStorage Persistence ----------
+  const STORAGE_KEY = "scorecard-playground-state";
+
+  function saveAllState() {
+    try {
+      const allState = {
+        slo: state,
+        vuln: vulnState,
+        bug: bugState,
+        pm: pmState
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(allState));
+    } catch (e) {
+      console.warn("Could not save state to localStorage:", e);
+    }
+  }
+
+  function loadAllState() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn("Could not load state from localStorage:", e);
+    }
+    return null;
+  }
+
+  // ---------- State ----------
+  const defaultState = () => ({
+    pointBudget: 20,
+    tierWeights: { p0: 2.0, p1: 1.0, p2: 0.5 },
+    slos: [
+      { name: "Checkout latency", ebPct: 60, tier: "p1" },
+      { name: "API availability", ebPct: 80, tier: "p0" },
+      { name: "Job success rate", ebPct: 90, tier: "p2" }
+    ]
+  });
+
+  // Load saved state or use defaults
+  const savedState = loadAllState();
+  let state = savedState?.slo || defaultState();
+
+  // ---------- DOM ----------
+  const el = {
+    pointBudget: document.getElementById("pointBudget"),
+    wP0: document.getElementById("wP0"),
+    wP1: document.getElementById("wP1"),
+    wP2: document.getElementById("wP2"),
+    addSlo: document.getElementById("addSlo"),
+    sloTbody: document.getElementById("sloTbody"),
+    scoreS: document.getElementById("scoreS"),
+    scoreBar: document.getElementById("scoreBar"),
+    points: document.getElementById("points"),
+    pointsMax: document.getElementById("pointsMax"),
+    pointsNote: document.getElementById("pointsNote"),
+    aggTable: document.getElementById("aggTable"),
+    formulaBox: document.getElementById("formulaBox"),
+  };
+
+  // Sidebar elements
+  const sidebarEl = {
+    // Grade badge
+    gradeBadge: document.getElementById("gradeBadge"),
+    // Totals
+    totalScore: document.getElementById("sidebarTotalScore"),
+    totalMax: document.getElementById("sidebarTotalMax"),
+    // Stacked bar segments
+    sloSegment: document.getElementById("stackedSloSegment"),
+    vulnSegment: document.getElementById("stackedVulnSegment"),
+    bugsSegment: document.getElementById("stackedBugsSegment"),
+    pmSegment: document.getElementById("stackedPmSegment"),
+    sloFill: document.getElementById("stackedSloFill"),
+    vulnFill: document.getElementById("stackedVulnFill"),
+    bugsFill: document.getElementById("stackedBugsFill"),
+    pmFill: document.getElementById("stackedPmFill"),
+    // Category rows
+    sloScore: document.getElementById("sidebarSloScore"),
+    sloPct: document.getElementById("sidebarSloPct"),
+    sloBar: document.getElementById("sidebarSloBar"),
+    vulnScore: document.getElementById("sidebarVulnScore"),
+    vulnPct: document.getElementById("sidebarVulnPct"),
+    vulnBar: document.getElementById("sidebarVulnBar"),
+    bugsScore: document.getElementById("sidebarBugsScore"),
+    bugsPct: document.getElementById("sidebarBugsPct"),
+    bugsBar: document.getElementById("sidebarBugsBar"),
+    pmScore: document.getElementById("sidebarPmScore"),
+    pmPct: document.getElementById("sidebarPmPct"),
+    pmBar: document.getElementById("sidebarPmBar"),
+  };
+
+  // Store current scores for sidebar
+  let currentScores = {
+    slo: 0,
+    sloMax: 20,
+    vulns: 0,
+    vulnsMax: 20,
+    bugs: 0,
+    bugsMax: 20,
+    pm: 0,
+    pmMax: 20,
+  };
+
+  function updateSidebar() {
+    const total = currentScores.slo + currentScores.vulns + currentScores.bugs + currentScores.pm;
+    const totalMax = currentScores.sloMax + currentScores.vulnsMax + currentScores.bugsMax + currentScores.pmMax;
+    const totalPct = totalMax > 0 ? (total / totalMax) : 0;
+    
+    // Helper for score color class
+    const getScoreClass = (pct) => {
+      if (pct >= 0.7) return "good";
+      if (pct >= 0.4) return "warn";
+      return "bad";
+    };
+    
+    // Helper for letter grade
+    const getGrade = (pct) => {
+      if (pct >= 0.9) return "A";
+      if (pct >= 0.8) return "B";
+      if (pct >= 0.7) return "C";
+      if (pct >= 0.6) return "D";
+      return "F";
+    };
+    
+    // Update grade badge
+    const grade = getGrade(totalPct);
+    sidebarEl.gradeBadge.textContent = grade;
+    sidebarEl.gradeBadge.className = "grade-badge grade-" + grade;
+    
+    // Update total score
+    sidebarEl.totalScore.textContent = Math.round(total);
+    sidebarEl.totalMax.textContent = Math.round(totalMax);
+    
+    // Update stacked bar segment widths (proportional to budget)
+    if (totalMax > 0) {
+      sidebarEl.sloSegment.style.flex = currentScores.sloMax;
+      sidebarEl.vulnSegment.style.flex = currentScores.vulnsMax;
+      sidebarEl.bugsSegment.style.flex = currentScores.bugsMax;
+      sidebarEl.pmSegment.style.flex = currentScores.pmMax;
+      
+      // Update segment fills (consumption within each segment)
+      const sloPct = currentScores.sloMax > 0 ? (currentScores.slo / currentScores.sloMax) : 0;
+      const vulnPct = currentScores.vulnsMax > 0 ? (currentScores.vulns / currentScores.vulnsMax) : 0;
+      const bugsPct = currentScores.bugsMax > 0 ? (currentScores.bugs / currentScores.bugsMax) : 0;
+      const pmPct = currentScores.pmMax > 0 ? (currentScores.pm / currentScores.pmMax) : 0;
+      
+      sidebarEl.sloFill.style.width = (sloPct * 100).toFixed(1) + "%";
+      sidebarEl.vulnFill.style.width = (vulnPct * 100).toFixed(1) + "%";
+      sidebarEl.bugsFill.style.width = (bugsPct * 100).toFixed(1) + "%";
+      sidebarEl.pmFill.style.width = (pmPct * 100).toFixed(1) + "%";
+      
+      // Update category rows
+      // SLOs
+      sidebarEl.sloScore.textContent = `${Math.round(currentScores.slo)} / ${Math.round(currentScores.sloMax)}`;
+      sidebarEl.sloPct.textContent = Math.round(sloPct * 100) + "%";
+      sidebarEl.sloPct.className = "category-pct " + getScoreClass(sloPct);
+      sidebarEl.sloBar.className = "category-bar " + getScoreClass(sloPct);
+      sidebarEl.sloBar.querySelector("div").style.width = (sloPct * 100).toFixed(1) + "%";
+      
+      // Vulns
+      sidebarEl.vulnScore.textContent = `${Math.round(currentScores.vulns)} / ${Math.round(currentScores.vulnsMax)}`;
+      sidebarEl.vulnPct.textContent = Math.round(vulnPct * 100) + "%";
+      sidebarEl.vulnPct.className = "category-pct " + getScoreClass(vulnPct);
+      sidebarEl.vulnBar.className = "category-bar " + getScoreClass(vulnPct);
+      sidebarEl.vulnBar.querySelector("div").style.width = (vulnPct * 100).toFixed(1) + "%";
+      
+      // Bugs
+      sidebarEl.bugsScore.textContent = `${Math.round(currentScores.bugs)} / ${Math.round(currentScores.bugsMax)}`;
+      sidebarEl.bugsPct.textContent = Math.round(bugsPct * 100) + "%";
+      sidebarEl.bugsPct.className = "category-pct " + getScoreClass(bugsPct);
+      sidebarEl.bugsBar.className = "category-bar " + getScoreClass(bugsPct);
+      sidebarEl.bugsBar.querySelector("div").style.width = (bugsPct * 100).toFixed(1) + "%";
+      
+      // Postmortems
+      sidebarEl.pmScore.textContent = `${Math.round(currentScores.pm)} / ${Math.round(currentScores.pmMax)}`;
+      sidebarEl.pmPct.textContent = Math.round(pmPct * 100) + "%";
+      sidebarEl.pmPct.className = "category-pct " + getScoreClass(pmPct);
+      sidebarEl.pmBar.className = "category-bar " + getScoreClass(pmPct);
+      sidebarEl.pmBar.querySelector("div").style.width = (pmPct * 100).toFixed(1) + "%";
+    }
+  }
+
+
+  // ---------- Rendering ----------
+  function weightForSlo(slo) {
+    return Number(state.tierWeights[slo.tier] ?? 1.0);
+  }
+
+  function renderTable() {
+    el.sloTbody.innerHTML = "";
+
+    state.slos.forEach((slo, idx) => {
+      const tr = document.createElement("tr");
+
+      // Name
+      const tdName = document.createElement("td");
+      const name = document.createElement("input");
+      name.type = "text";
+      name.value = slo.name;
+      name.addEventListener("input", () => { slo.name = name.value; recompute(); });
+      tdName.appendChild(name);
+
+      // EB%
+      const tdEb = document.createElement("td");
+      const eb = document.createElement("input");
+      eb.type = "number";
+      eb.min = "0";
+      eb.max = "100";
+      eb.step = "1";
+      eb.value = slo.ebPct;
+      eb.addEventListener("input", () => { slo.ebPct = Number(eb.value); recompute(); });
+      tdEb.appendChild(eb);
+
+      // Tier
+      const tdTier = document.createElement("td");
+      const tier = document.createElement("select");
+      ["p0","p1","p2"].forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = t;
+        tier.appendChild(opt);
+      });
+      tier.value = slo.tier;
+      tier.addEventListener("change", () => { slo.tier = tier.value; recompute(); });
+      tdTier.appendChild(tier);
+
+      // Remove
+      const tdRm = document.createElement("td");
+      const rm = document.createElement("button");
+      rm.className = "btn danger";
+      rm.textContent = "Remove";
+      rm.addEventListener("click", () => {
+        state.slos.splice(idx, 1);
+        renderTable();
+        recompute();
+      });
+      tdRm.appendChild(rm);
+
+      [tdName, tdTier, tdEb, tdRm].forEach(td => tr.appendChild(td));
+      el.sloTbody.appendChild(tr);
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+  }
+
+  function renderAggregateViz(items, denom, numer, S) {
+    const thead = el.aggTable.querySelector("thead");
+    const tbody = el.aggTable.querySelector("tbody");
+    const tfoot = el.aggTable.querySelector("tfoot");
+    
+    thead.innerHTML = "";
+    tbody.innerHTML = "";
+    tfoot.innerHTML = "";
+    
+    if (items.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="muted">No SLOs defined.</td></tr>`;
+      return;
+    }
+
+    // Header
+    thead.innerHTML = `
+      <tr>
+        <th>SLO</th>
+        <th class="right">sᵢ</th>
+        <th class="right">wᵢ</th>
+        <th class="right">wᵢ · sᵢ</th>
+      </tr>
+    `;
+
+    // Body rows
+    items.forEach(it => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(it.name)}</td>
+        <td class="mono right">${fmt(it.s, 4)}</td>
+        <td class="mono right">${fmt(it.w, 2)}</td>
+        <td class="mono right">${fmt(it.ws, 4)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Footer with totals
+    tfoot.innerHTML = `
+      <tr>
+        <td>Total</td>
+        <td class="mono right muted">—</td>
+        <td class="mono right">${fmt(denom, 2)}</td>
+        <td class="mono right">${fmt(numer, 4)}</td>
+      </tr>
+      <tr>
+        <td colspan="3" style="text-align: right; padding-right: 10px;">S = Σ(wᵢ·sᵢ) / Σ(wᵢ) =</td>
+        <td class="mono right" style="font-size: 16px;">${fmt(S, 4)}</td>
+      </tr>
+    `;
+  }
+
+  // ---------- Compute ----------
+  function recompute() {
+    // Keep tier weights synced
+    state.tierWeights.p0 = Number(el.wP0.value);
+    state.tierWeights.p1 = Number(el.wP1.value);
+    state.tierWeights.p2 = Number(el.wP2.value);
+
+    // Build per-SLO values
+    const items = state.slos.map(slo => {
+      const ebPct = Number(slo.ebPct);
+      const s = clamp(ebPct / 100, 0, 1);
+      const w = Math.max(0, Number(weightForSlo(slo))); // don't allow negative weight
+      const ws = w * s;
+      return { ...slo, ebPct, s, w, ws };
+    });
+
+    // Weighted average
+    const denom = items.reduce((acc, it) => acc + it.w, 0);
+    const numer = items.reduce((acc, it) => acc + it.ws, 0);
+    const S = (denom > 0 && items.length > 0) ? (numer / denom) : 0;
+    
+    const pointBudget = Math.max(0, Number(el.pointBudget.value) || 0);
+    state.pointBudget = pointBudget;
+    const points = pointBudget * clamp(S, 0, 1);
+
+    // Render results
+    el.scoreS.textContent = fmt(S, 4);
+    el.points.textContent = fmt2(points);
+    el.pointsMax.textContent = pointBudget;
+    el.scoreBar.style.width = (S * 100).toFixed(1) + "%";
+
+    // Status note
+    el.pointsNote.textContent = `Computed from ${items.length} SLO(s)`;
+
+    // Render aggregate visualization
+    renderAggregateViz(items, denom, numer, S);
+
+    // Formula box
+    const modeDesc = `Tier weights (p0=${state.tierWeights.p0}, p1=${state.tierWeights.p1}, p2=${state.tierWeights.p2})`;
+
+    el.formulaBox.textContent =
+`DEFINITIONS
+  The subscript "i" refers to an individual SLO (e.g., w₁ is the weight for SLO 1).
+
+  wᵢ    = weight for an individual SLO (determined by tier: ${modeDesc})
+  sᵢ    = normalized value for an individual SLO (its EB% ÷ 100, clamped to 0–1)
+  S     = weighted average of all individual sᵢ values (0–1)
+  Score = final scorecard value (budget × S)
+
+CALCULATION
+  For each SLO:  sᵢ = EBᵢ ÷ 100
+
+  Weighted average:
+    S = sum of (wᵢ × sᵢ) ÷ sum of (wᵢ)
+    S = ${fmt(numer,4)} ÷ ${fmt(denom,4)} = ${fmt(S,4)}
+
+  Final score:
+    score = budget × S
+    score = ${pointBudget} × ${fmt(S,4)} = ${fmt2(points)}
+`;
+
+    renderTable();
+    
+    // Update sidebar
+    currentScores.slo = points;
+    currentScores.sloMax = pointBudget;
+    updateSidebar();
+    
+    // Persist state
+    saveAllState();
+  }
+
+  // ---------- Events ----------
+  el.pointBudget.addEventListener("input", recompute);
+  el.wP0.addEventListener("input", recompute);
+  el.wP1.addEventListener("input", recompute);
+  el.wP2.addEventListener("input", recompute);
+
+  const sloNameInventory = [
+    "API availability",
+    "Checkout latency",
+    "Login success rate",
+    "Payment processing time",
+    "Search response time",
+    "Order completion rate",
+    "Page load time",
+    "Database query latency",
+    "Cache hit rate",
+    "Error rate",
+    "Webhook delivery",
+    "Email delivery rate",
+    "File upload success",
+    "Session creation time",
+    "Report generation time",
+    "Data sync latency",
+    "Notification delivery",
+    "Authentication latency",
+    "Image processing time",
+    "Video transcoding rate",
+    "Batch job success rate",
+    "Queue processing time",
+    "CDN response time",
+    "Mobile app crash rate",
+    "Third-party API latency",
+  ];
+
+  function getRandomSloName() {
+    const usedNames = new Set(state.slos.map(s => s.name));
+    const available = sloNameInventory.filter(n => !usedNames.has(n));
+    if (available.length === 0) {
+      return `Custom SLO ${state.slos.length + 1}`;
+    }
+    return available[Math.floor(Math.random() * available.length)];
+  }
+
+  el.addSlo.addEventListener("click", () => {
+    state.slos.push({
+      name: getRandomSloName(),
+      ebPct: Math.floor(Math.random() * 51) + 50, // Random 50-100
+      tier: ["p0", "p1", "p2"][Math.floor(Math.random() * 3)]
+    });
+    renderTable();
+    recompute();
+  });
+
+  function syncControlsFromState() {
+    el.pointBudget.value = state.pointBudget;
+    el.wP0.value = state.tierWeights.p0;
+    el.wP1.value = state.tierWeights.p1;
+    el.wP2.value = state.tierWeights.p2;
+  }
+
+  // ---------- Init ----------
+    syncControlsFromState();
+    renderTable();
+    recompute();
+
+  // ==========================================================================
+  // CONTAINER VULNS SECTION
+  // ==========================================================================
+
+  // ---------- Vuln State ----------
+  const defaultVulnState = () => ({
+    budget: 20,
+    weights: { critical: 4.0, high: 2.0, medium: 1.0, low: 0.5 },
+    method: "exponential",
+    params: {
+      exponential: { decay: 0.85 },
+      linear: { threshold: 10 },
+      inverse: { k: 1.0 },
+      logarithmic: { maxExpected: 20 },
+      sigmoid: { midpoint: 5, steepness: 1.0 },
+      bucket: { buckets: [[0, 1.0], [1, 0.8], [3, 0.5], [6, 0.2], [11, 0.0]] }
+    },
+    images: [
+      { name: "api-server", critical: 2, high: 5, medium: 12, low: 34 },
+      { name: "worker", critical: 0, high: 1, medium: 3, low: 8 },
+      { name: "frontend", critical: 1, high: 0, medium: 2, low: 15 }
+    ]
+  });
+
+  let vulnState = savedState?.vuln || defaultVulnState();
+
+  // ---------- Vuln DOM ----------
+  const vulnEl = {
+    wCritical: document.getElementById("vulnWCritical"),
+    wHigh: document.getElementById("vulnWHigh"),
+    wMedium: document.getElementById("vulnWMedium"),
+    wLow: document.getElementById("vulnWLow"),
+    budget: document.getElementById("vulnBudget"),
+    method: document.getElementById("vulnMethod"),
+    methodParams: document.getElementById("vulnMethodParams"),
+    chartCanvas: document.getElementById("vulnChart"),
+    showAllMethods: document.getElementById("vulnShowAllMethods"),
+    tbody: document.getElementById("vulnTbody"),
+    addBtn: document.getElementById("addVuln"),
+    scoreS: document.getElementById("vulnScoreS"),
+    scoreBar: document.getElementById("vulnScoreBar"),
+    score: document.getElementById("vulnScore"),
+    scoreMax: document.getElementById("vulnScoreMax"),
+    scoreNote: document.getElementById("vulnScoreNote"),
+    aggTable: document.getElementById("vulnAggTable"),
+    formulaBox: document.getElementById("vulnFormulaBox"),
+  };
+
+  // Chart instance
+  let vulnChart = null;
+  
+  // Method colors for chart
+  const methodColors = {
+    exponential: { border: "#6ee7b7", bg: "rgba(110,231,183,0.1)" },
+    linear: { border: "#fb7185", bg: "rgba(251,113,133,0.1)" },
+    inverse: { border: "#93c5fd", bg: "rgba(147,197,253,0.1)" },
+    logarithmic: { border: "#fde68a", bg: "rgba(253,230,138,0.1)" },
+    sigmoid: { border: "#c4b5fd", bg: "rgba(196,181,253,0.1)" },
+    bucket: { border: "#fdba74", bg: "rgba(253,186,116,0.1)" }
+  };
+
+  // ---------- Normalization Methods ----------
+  const normMethods = {
+    exponential: {
+      name: "Exponential decay",
+      calc: (count, params) => Math.pow(params.decay, count),
+      formula: (params) => `sᵢ = ${params.decay}^count`,
+      examples: (params) => {
+        const d = params.decay;
+        return `0 → 1.00, 1 → ${fmt2(Math.pow(d,1))}, 3 → ${fmt2(Math.pow(d,3))}, 5 → ${fmt2(Math.pow(d,5))}, 10 → ${fmt2(Math.pow(d,10))}`;
+      }
+    },
+    linear: {
+      name: "Linear threshold",
+      calc: (count, params) => Math.max(0, 1 - count / params.threshold),
+      formula: (params) => `sᵢ = max(0, 1 - count / ${params.threshold})`,
+      examples: (params) => {
+        const t = params.threshold;
+        return `0 → 1.00, ${Math.floor(t/2)} → ${fmt2(0.5)}, ${t} → 0.00, ${t+5} → 0.00`;
+      }
+    },
+    inverse: {
+      name: "Inverse (hyperbolic)",
+      calc: (count, params) => 1 / (1 + params.k * count),
+      formula: (params) => `sᵢ = 1 / (1 + ${params.k} × count)`,
+      examples: (params) => {
+        const k = params.k;
+        const f = c => 1 / (1 + k * c);
+        return `0 → 1.00, 1 → ${fmt2(f(1))}, 3 → ${fmt2(f(3))}, 5 → ${fmt2(f(5))}, 10 → ${fmt2(f(10))}`;
+      }
+    },
+    logarithmic: {
+      name: "Logarithmic",
+      calc: (count, params) => Math.max(0, 1 - Math.log(1 + count) / Math.log(1 + params.maxExpected)),
+      formula: (params) => `sᵢ = max(0, 1 - log(1+count) / log(1+${params.maxExpected}))`,
+      examples: (params) => {
+        const m = params.maxExpected;
+        const f = c => Math.max(0, 1 - Math.log(1+c) / Math.log(1+m));
+        return `0 → 1.00, 1 → ${fmt2(f(1))}, 5 → ${fmt2(f(5))}, ${m} → 0.00`;
+      }
+    },
+    sigmoid: {
+      name: "Sigmoid (S-curve)",
+      calc: (count, params) => 1 / (1 + Math.exp(params.steepness * (count - params.midpoint))),
+      formula: (params) => `sᵢ = 1 / (1 + e^(${params.steepness} × (count - ${params.midpoint})))`,
+      examples: (params) => {
+        const f = c => 1 / (1 + Math.exp(params.steepness * (c - params.midpoint)));
+        return `0 → ${fmt2(f(0))}, ${params.midpoint} → 0.50, ${params.midpoint * 2} → ${fmt2(f(params.midpoint * 2))}`;
+      }
+    },
+    bucket: {
+      name: "Bucket / Step function",
+      calc: (count, params) => {
+        const buckets = params.buckets; // [[threshold, score], ...]
+        let score = 1.0;
+        for (const [thresh, s] of buckets) {
+          if (count >= thresh) score = s;
+        }
+        return score;
+      },
+      formula: (params) => `Step function with ${params.buckets.length} buckets`,
+      examples: (params) => {
+        return params.buckets.map(([t, s]) => `${t}+ → ${fmt2(s)}`).join(", ");
+      }
+    }
+  };
+
+  // ---------- Render Chart ----------
+  function renderVulnChart() {
+    const showAll = vulnEl.showAllMethods.checked;
+    const currentMethod = vulnState.method;
+    const maxCount = 25;
+    
+    // Generate x-axis labels (counts 0 to maxCount)
+    const labels = Array.from({ length: maxCount + 1 }, (_, i) => i);
+    
+    // Generate datasets
+    const datasets = [];
+    
+    if (showAll) {
+      // Show all methods
+      Object.entries(normMethods).forEach(([key, methodInfo]) => {
+        const params = vulnState.params[key];
+        const data = labels.map(count => methodInfo.calc(count, params));
+        const isSelected = key === currentMethod;
+        
+        datasets.push({
+          label: methodInfo.name,
+          data: data,
+          borderColor: methodColors[key].border,
+          backgroundColor: isSelected ? methodColors[key].bg : "transparent",
+          borderWidth: isSelected ? 3 : 1.5,
+          pointRadius: 0,
+          tension: key === "bucket" ? 0 : 0.3,
+          stepped: key === "bucket" ? "before" : false,
+          fill: isSelected,
+          order: isSelected ? 0 : 1  // Selected on top
+        });
+      });
+    } else {
+      // Show only selected method
+      const params = vulnState.params[currentMethod];
+      const methodInfo = normMethods[currentMethod];
+      const data = labels.map(count => methodInfo.calc(count, params));
+      
+      datasets.push({
+        label: methodInfo.name,
+        data: data,
+        borderColor: methodColors[currentMethod].border,
+        backgroundColor: methodColors[currentMethod].bg,
+        borderWidth: 3,
+        pointRadius: 0,
+        tension: currentMethod === "bucket" ? 0 : 0.3,
+        stepped: currentMethod === "bucket" ? "before" : false,
+        fill: true
+      });
+    }
+    
+    // Create or update chart
+    if (vulnChart) {
+      vulnChart.data.labels = labels;
+      vulnChart.data.datasets = datasets;
+      vulnChart.update("none");  // No animation for snappy updates
+    } else {
+      vulnChart = new Chart(vulnEl.chartCanvas, {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            intersect: false,
+            mode: "index"
+          },
+          plugins: {
+            legend: {
+              display: showAll,
+              position: "bottom",
+              labels: {
+                color: "#a9b4d6",
+                font: { size: 11 },
+                boxWidth: 12,
+                padding: 8
+              }
+            },
+            tooltip: {
+              backgroundColor: "rgba(17,25,53,0.95)",
+              titleColor: "#e9eefc",
+              bodyColor: "#a9b4d6",
+              borderColor: "rgba(255,255,255,0.1)",
+              borderWidth: 1,
+              padding: 10,
+              callbacks: {
+                title: (items) => `Count: ${items[0].label}`,
+                label: (item) => `${item.dataset.label}: ${item.parsed.y.toFixed(4)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: "Vulnerability Count",
+                color: "#a9b4d6",
+                font: { size: 11 }
+              },
+              ticks: { color: "#a9b4d6", font: { size: 10 } },
+              grid: { color: "rgba(255,255,255,0.06)" }
+            },
+            y: {
+              min: 0,
+              max: 1,
+              title: {
+                display: true,
+                text: "Normalized Score (sᵢ)",
+                color: "#a9b4d6",
+                font: { size: 11 }
+              },
+              ticks: { color: "#a9b4d6", font: { size: 10 } },
+              grid: { color: "rgba(255,255,255,0.06)" }
+            }
+          }
+        }
+      });
+    }
+    
+    // Update legend visibility when toggling show all
+    vulnChart.options.plugins.legend.display = showAll;
+    vulnChart.update("none");
+  }
+
+  // ---------- Render Method Params ----------
+  function renderVulnMethodParams() {
+    const method = vulnState.method;
+    const params = vulnState.params[method];
+    const methodInfo = normMethods[method];
+    
+    let html = "";
+    
+    if (method === "exponential") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Decay rate:</span>
+          <input type="number" id="vulnParamDecay" step="0.05" min="0.1" max="0.99" value="${params.decay}" style="width: 80px;" />
+          <span class="muted small">Each vuln multiplies score by this</span>
+        </div>
+      `;
+    } else if (method === "linear") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Threshold:</span>
+          <input type="number" id="vulnParamThreshold" step="1" min="1" value="${params.threshold}" style="width: 80px;" />
+          <span class="muted small">Count at which score = 0</span>
+        </div>
+      `;
+    } else if (method === "inverse") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Steepness (k):</span>
+          <input type="number" id="vulnParamK" step="0.1" min="0.1" value="${params.k}" style="width: 80px;" />
+          <span class="muted small">Higher = faster drop</span>
+        </div>
+      `;
+    } else if (method === "logarithmic") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Max expected:</span>
+          <input type="number" id="vulnParamMax" step="1" min="1" value="${params.maxExpected}" style="width: 80px;" />
+          <span class="muted small">Count at which score = 0</span>
+        </div>
+      `;
+    } else if (method === "sigmoid") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Midpoint:</span>
+          <input type="number" id="vulnParamMidpoint" step="1" min="1" value="${params.midpoint}" style="width: 80px;" />
+          <span class="muted small">Count where score = 0.5</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">Steepness:</span>
+          <input type="number" id="vulnParamSteepness" step="0.1" min="0.1" value="${params.steepness}" style="width: 80px;" />
+          <span class="muted small">Higher = sharper transition</span>
+        </div>
+      `;
+    } else if (method === "bucket") {
+      html = `
+        <div class="param-row">
+          <span class="muted small">Bucket definitions (count threshold → score):</span>
+        </div>
+        <div class="param-row" style="flex-wrap: wrap; gap: 6px;">
+          ${params.buckets.map(([t, s], i) => `
+            <span class="mono" style="background: rgba(255,255,255,.1); padding: 4px 8px; border-radius: 6px;">
+              ${t}+ → ${fmt2(s)}
+            </span>
+          `).join("")}
+        </div>
+      `;
+    }
+    
+    // Add formula and examples
+    html += `
+      <div class="formula-display" id="vulnParamFormula">Formula: ${methodInfo.formula(params)}</div>
+      <div class="example-display" id="vulnParamExample">Example: ${methodInfo.examples(params)}</div>
+    `;
+    
+    vulnEl.methodParams.innerHTML = html;
+    
+    // Add event listeners for param inputs
+    attachVulnParamListeners();
+  }
+
+  function updateVulnFormulaDisplay() {
+    const method = vulnState.method;
+    const params = vulnState.params[method];
+    const methodInfo = normMethods[method];
+    
+    const formulaEl = document.getElementById("vulnParamFormula");
+    const exampleEl = document.getElementById("vulnParamExample");
+    
+    if (formulaEl) formulaEl.textContent = `Formula: ${methodInfo.formula(params)}`;
+    if (exampleEl) exampleEl.textContent = `Example: ${methodInfo.examples(params)}`;
+  }
+
+  function attachVulnParamListeners() {
+    const method = vulnState.method;
+    
+    if (method === "exponential") {
+      const inp = document.getElementById("vulnParamDecay");
+      if (inp) inp.addEventListener("input", () => {
+        vulnState.params.exponential.decay = Number(inp.value) || 0.7;
+        updateVulnFormulaDisplay();
+        recomputeVuln();
+      });
+    } else if (method === "linear") {
+      const inp = document.getElementById("vulnParamThreshold");
+      if (inp) inp.addEventListener("input", () => {
+        vulnState.params.linear.threshold = Number(inp.value) || 10;
+        updateVulnFormulaDisplay();
+        recomputeVuln();
+      });
+    } else if (method === "inverse") {
+      const inp = document.getElementById("vulnParamK");
+      if (inp) inp.addEventListener("input", () => {
+        vulnState.params.inverse.k = Number(inp.value) || 1;
+        updateVulnFormulaDisplay();
+        recomputeVuln();
+      });
+    } else if (method === "logarithmic") {
+      const inp = document.getElementById("vulnParamMax");
+      if (inp) inp.addEventListener("input", () => {
+        vulnState.params.logarithmic.maxExpected = Number(inp.value) || 20;
+        updateVulnFormulaDisplay();
+        recomputeVuln();
+      });
+    } else if (method === "sigmoid") {
+      const mid = document.getElementById("vulnParamMidpoint");
+      const steep = document.getElementById("vulnParamSteepness");
+      if (mid) mid.addEventListener("input", () => {
+        vulnState.params.sigmoid.midpoint = Number(mid.value) || 5;
+        updateVulnFormulaDisplay();
+        recomputeVuln();
+      });
+      if (steep) steep.addEventListener("input", () => {
+        vulnState.params.sigmoid.steepness = Number(steep.value) || 1;
+        updateVulnFormulaDisplay();
+        recomputeVuln();
+      });
+    }
+  }
+
+  // ---------- Render Vuln Table ----------
+  function renderVulnTable() {
+    vulnEl.tbody.innerHTML = "";
+    
+    vulnState.images.forEach((img, idx) => {
+      const tr = document.createElement("tr");
+      
+      tr.innerHTML = `
+        <td><input type="text" value="${escapeHtml(img.name)}" style="width: 120px;" data-idx="${idx}" data-field="name" /></td>
+        <td><input type="number" value="${img.critical}" min="0" style="width: 60px;" data-idx="${idx}" data-field="critical" /></td>
+        <td><input type="number" value="${img.high}" min="0" style="width: 60px;" data-idx="${idx}" data-field="high" /></td>
+        <td><input type="number" value="${img.medium}" min="0" style="width: 60px;" data-idx="${idx}" data-field="medium" /></td>
+        <td><input type="number" value="${img.low}" min="0" style="width: 60px;" data-idx="${idx}" data-field="low" /></td>
+        <td><button class="btn danger" data-idx="${idx}">Remove</button></td>
+      `;
+      
+      vulnEl.tbody.appendChild(tr);
+    });
+    
+    // Add event listeners
+    vulnEl.tbody.querySelectorAll("input").forEach(inp => {
+      inp.addEventListener("input", () => {
+        const idx = Number(inp.dataset.idx);
+        const field = inp.dataset.field;
+        if (field === "name") {
+          vulnState.images[idx].name = inp.value;
+        } else {
+          vulnState.images[idx][field] = Number(inp.value) || 0;
+        }
+        recomputeVuln();
+      });
+    });
+    
+    vulnEl.tbody.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.dataset.idx);
+        vulnState.images.splice(idx, 1);
+        renderVulnTable();
+        recomputeVuln();
+      });
+    });
+  }
+
+  // ---------- Compute Vuln Score ----------
+  function computeVulnScore(method, params) {
+    const weights = vulnState.weights;
+    const calcFn = normMethods[method].calc;
+    const severities = ["critical", "high", "medium", "low"];
+    
+    // Aggregate vulnerabilities by severity across ALL images
+    const severityTotals = {};
+    severities.forEach(sev => {
+      severityTotals[sev] = vulnState.images.reduce((sum, img) => sum + (img[sev] || 0), 0);
+    });
+    
+    // Normalize each severity's total count, then compute weighted average
+    const items = severities.map(sev => {
+      const count = severityTotals[sev];
+      const w = weights[sev];
+      const s = calcFn(count, params);
+      return { name: sev.charAt(0).toUpperCase() + sev.slice(1), severity: sev, count, w, s, ws: w * s };
+    });
+    
+    const denom = items.reduce((acc, it) => acc + it.w, 0);
+    const numer = items.reduce((acc, it) => acc + it.ws, 0);
+    const S = denom > 0 ? numer / denom : 0;
+    
+    return { items, denom, numer, S, severityTotals };
+  }
+
+  function recomputeVuln() {
+    // Sync weights
+    vulnState.weights.critical = Number(vulnEl.wCritical.value) || 4;
+    vulnState.weights.high = Number(vulnEl.wHigh.value) || 2;
+    vulnState.weights.medium = Number(vulnEl.wMedium.value) || 1;
+    vulnState.weights.low = Number(vulnEl.wLow.value) || 0.5;
+    
+    vulnState.budget = Number(vulnEl.budget.value) || 20;
+    vulnState.method = vulnEl.method.value;
+    
+    const method = vulnState.method;
+    const params = vulnState.params[method];
+    
+    const { items, denom, numer, S } = computeVulnScore(method, params);
+    const score = vulnState.budget * clamp(S, 0, 1);
+    
+    // Update display
+    vulnEl.scoreS.textContent = fmt(S, 4);
+    vulnEl.score.textContent = fmt2(score);
+    vulnEl.scoreMax.textContent = vulnState.budget;
+    vulnEl.scoreBar.style.width = (S * 100).toFixed(1) + "%";
+    const totalVulns = vulnState.images.reduce((sum, img) => 
+      sum + img.critical + img.high + img.medium + img.low, 0);
+    vulnEl.scoreNote.textContent = `${totalVulns} vulns across ${vulnState.images.length} image(s)`;
+    
+    // Render aggregate table
+    renderVulnAggTable(items, denom, numer, S);
+    
+    // Render chart
+    renderVulnChart();
+    
+    // Render formula box
+    renderVulnFormula(method, params, S, score);
+    
+    // Update sidebar
+    currentScores.vulns = score;
+    currentScores.vulnsMax = vulnState.budget;
+    updateSidebar();
+    
+    // Persist state
+    saveAllState();
+  }
+
+  function renderVulnAggTable(items, denom, numer, S) {
+    const thead = vulnEl.aggTable.querySelector("thead");
+    const tbody = vulnEl.aggTable.querySelector("tbody");
+    const tfoot = vulnEl.aggTable.querySelector("tfoot");
+    
+    thead.innerHTML = "";
+    tbody.innerHTML = "";
+    tfoot.innerHTML = "";
+    
+    if (vulnState.images.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="muted">No images defined.</td></tr>`;
+      return;
+    }
+    
+    thead.innerHTML = `
+      <tr>
+        <th>Severity</th>
+        <th class="right">Total Count</th>
+        <th class="right">sᵢ</th>
+        <th class="right">wᵢ</th>
+        <th class="right">wᵢ · sᵢ</th>
+      </tr>
+    `;
+    
+    items.forEach(it => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(it.name)}</td>
+        <td class="mono right">${it.count}</td>
+        <td class="mono right">${fmt(it.s, 4)}</td>
+        <td class="mono right">${fmt(it.w, 2)}</td>
+        <td class="mono right">${fmt(it.ws, 4)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    
+    tfoot.innerHTML = `
+      <tr>
+        <td>Total</td>
+        <td class="mono right muted">—</td>
+        <td class="mono right muted">—</td>
+        <td class="mono right">${fmt(denom, 2)}</td>
+        <td class="mono right">${fmt(numer, 4)}</td>
+      </tr>
+      <tr>
+        <td colspan="4" style="text-align: right; padding-right: 10px;">S = Σ(wᵢ·sᵢ) / Σ(wᵢ) =</td>
+        <td class="mono right" style="font-size: 16px;">${fmt(S, 4)}</td>
+      </tr>
+    `;
+  }
+
+  function renderVulnFormula(method, params, S, score) {
+    const methodInfo = normMethods[method];
+    const weightsDesc = `Critical=${vulnState.weights.critical}, High=${vulnState.weights.high}, Medium=${vulnState.weights.medium}, Low=${vulnState.weights.low}`;
+    
+    // Get severity totals for display
+    const severities = ["critical", "high", "medium", "low"];
+    const totals = severities.map(sev => {
+      const count = vulnState.images.reduce((sum, img) => sum + (img[sev] || 0), 0);
+      return `${sev}: ${count}`;
+    }).join(", ");
+    
+    vulnEl.formulaBox.textContent = 
+`DEFINITIONS
+  The subscript "i" refers to a severity level (Critical, High, Medium, Low).
+  
+  wᵢ    = weight for severity i (${weightsDesc})
+  sᵢ    = normalized score for severity i (based on total count across all images)
+  S     = weighted average of all severity scores (0–1)
+  Score = final scorecard value (budget × S)
+
+HOW IT WORKS
+  1. Sum vulnerability counts by severity across ALL images
+     Current totals: ${totals}
+  
+  2. Normalize each severity's total using: ${methodInfo.formula(params)}
+  
+  3. Compute weighted average: S = Σ(wᵢ·sᵢ) / Σ(wᵢ)
+
+CALCULATION
+  S = ${fmt(S, 4)}
+  Score = ${vulnState.budget} × ${fmt(S, 4)} = ${fmt2(score)}
+`;
+  }
+
+  // ---------- Vuln Events ----------
+  vulnEl.method.addEventListener("change", () => {
+    vulnState.method = vulnEl.method.value;
+    renderVulnMethodParams();
+    recomputeVuln();
+  });
+  
+  vulnEl.wCritical.addEventListener("input", recomputeVuln);
+  vulnEl.wHigh.addEventListener("input", recomputeVuln);
+  vulnEl.wMedium.addEventListener("input", recomputeVuln);
+  vulnEl.wLow.addEventListener("input", recomputeVuln);
+  
+  vulnEl.showAllMethods.addEventListener("change", renderVulnChart);
+  vulnEl.budget.addEventListener("input", recomputeVuln);
+  
+  const imageNameInventory = [
+    "api-server", "worker", "frontend", "backend", "gateway",
+    "scheduler", "cache", "database", "auth-service", "payment-service",
+    "notification-service", "analytics", "search", "cdn-origin", "proxy"
+  ];
+  
+  vulnEl.addBtn.addEventListener("click", () => {
+    const usedNames = new Set(vulnState.images.map(i => i.name));
+    const available = imageNameInventory.filter(n => !usedNames.has(n));
+    const name = available.length > 0 
+      ? available[Math.floor(Math.random() * available.length)]
+      : `image-${vulnState.images.length + 1}`;
+    
+    vulnState.images.push({
+      name,
+      critical: Math.floor(Math.random() * 3),
+      high: Math.floor(Math.random() * 6),
+      medium: Math.floor(Math.random() * 15),
+      low: Math.floor(Math.random() * 40)
+    });
+    renderVulnTable();
+    recomputeVuln();
+  });
+
+  // ---------- Vuln Init ----------
+  function syncVulnControlsFromState() {
+    vulnEl.budget.value = vulnState.budget;
+    vulnEl.wCritical.value = vulnState.weights.critical;
+    vulnEl.wHigh.value = vulnState.weights.high;
+    vulnEl.wMedium.value = vulnState.weights.medium;
+    vulnEl.wLow.value = vulnState.weights.low;
+    vulnEl.method.value = vulnState.method;
+  }
+  
+  syncVulnControlsFromState();
+  renderVulnMethodParams();
+  renderVulnTable();
+  recomputeVuln();
+
+  // ==========================================================================
+  // BUG REPORTS SECTION
+  // ==========================================================================
+
+  const defaultBugState = () => ({
+    budget: 20,
+    weights: { p0: 4.0, p1: 2.0, p2: 1.0 },
+    decay: 0.85,
+    counts: { p0: 1, p1: 3, p2: 8 }
+  });
+
+  let bugState = savedState?.bug || defaultBugState();
+
+  // ---------- Bug DOM ----------
+  const bugEl = {
+    wP0: document.getElementById("bugWP0"),
+    wP1: document.getElementById("bugWP1"),
+    wP2: document.getElementById("bugWP2"),
+    budget: document.getElementById("bugBudget"),
+    decay: document.getElementById("bugDecay"),
+    chartCanvas: document.getElementById("bugChart"),
+    countP0: document.getElementById("bugCountP0"),
+    countP1: document.getElementById("bugCountP1"),
+    countP2: document.getElementById("bugCountP2"),
+    scoreS: document.getElementById("bugScoreS"),
+    scoreBar: document.getElementById("bugScoreBar"),
+    score: document.getElementById("bugScore"),
+    scoreMax: document.getElementById("bugScoreMax"),
+    scoreNote: document.getElementById("bugScoreNote"),
+    aggTable: document.getElementById("bugAggTable"),
+    formulaBox: document.getElementById("bugFormulaBox"),
+  };
+
+  // Chart instance
+  let bugChart = null;
+
+  // ---------- Compute Bug Score ----------
+  function computeBugScore() {
+    const priorities = ["p0", "p1", "p2"];
+    const decay = bugState.decay;
+    
+    const items = priorities.map(prio => {
+      const count = bugState.counts[prio] || 0;
+      const w = bugState.weights[prio] || 1;
+      const s = Math.pow(decay, count);
+      return { name: prio.toUpperCase(), prio, count, w, s, ws: w * s };
+    });
+    
+    const denom = items.reduce((sum, it) => sum + it.w, 0);
+    const numer = items.reduce((sum, it) => sum + it.ws, 0);
+    const S = denom > 0 ? numer / denom : 1;
+    
+    return { items, denom, numer, S };
+  }
+
+  function recomputeBug() {
+    // Sync state from inputs
+    bugState.weights.p0 = Number(bugEl.wP0.value) || 4;
+    bugState.weights.p1 = Number(bugEl.wP1.value) || 2;
+    bugState.weights.p2 = Number(bugEl.wP2.value) || 1;
+    bugState.budget = Number(bugEl.budget.value) || 20;
+    bugState.decay = Number(bugEl.decay.value) || 0.85;
+    bugState.counts.p0 = Number(bugEl.countP0.value) || 0;
+    bugState.counts.p1 = Number(bugEl.countP1.value) || 0;
+    bugState.counts.p2 = Number(bugEl.countP2.value) || 0;
+    
+    const { items, denom, numer, S } = computeBugScore();
+    const score = bugState.budget * clamp(S, 0, 1);
+    
+    // Update KPIs
+    bugEl.scoreS.textContent = fmt(S, 4);
+    bugEl.score.textContent = fmt2(score);
+    bugEl.scoreMax.textContent = bugState.budget;
+    bugEl.scoreBar.style.width = (S * 100).toFixed(1) + "%";
+    
+    // Status note
+    let note = "";
+    if (S >= 0.9) note = "Excellent – very few bugs";
+    else if (S >= 0.7) note = "Good – manageable bug count";
+    else if (S >= 0.5) note = "Fair – bugs accumulating";
+    else if (S >= 0.3) note = "Poor – significant bug backlog";
+    else note = "Critical – overwhelming bug count";
+    bugEl.scoreNote.textContent = note;
+    
+    // Render aggregate table
+    renderBugAggTable(items, denom, numer, S);
+    
+    // Render chart
+    renderBugChart();
+    
+    // Render formula
+    renderBugFormula(items, denom, numer, S, score);
+    
+    // Update sidebar
+    currentScores.bugs = score;
+    currentScores.bugsMax = bugState.budget;
+    updateSidebar();
+    
+    // Persist state
+    saveAllState();
+  }
+
+  function renderBugAggTable(items, denom, numer, S) {
+    const thead = bugEl.aggTable.querySelector("thead");
+    const tbody = bugEl.aggTable.querySelector("tbody");
+    const tfoot = bugEl.aggTable.querySelector("tfoot");
+    
+    thead.innerHTML = "";
+    tbody.innerHTML = "";
+    tfoot.innerHTML = "";
+    
+    if (items.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="muted">No data.</td></tr>`;
+      return;
+    }
+    
+    thead.innerHTML = `
+      <tr>
+        <th>Priority</th>
+        <th class="right">Count</th>
+        <th class="right">sᵢ</th>
+        <th class="right">wᵢ</th>
+        <th class="right">wᵢ · sᵢ</th>
+      </tr>
+    `;
+    
+    items.forEach(it => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(it.name)}</td>
+        <td class="mono right">${it.count}</td>
+        <td class="mono right">${fmt(it.s, 4)}</td>
+        <td class="mono right">${fmt(it.w, 2)}</td>
+        <td class="mono right">${fmt(it.ws, 4)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    
+    tfoot.innerHTML = `
+      <tr>
+        <td>Total</td>
+        <td class="mono right muted">—</td>
+        <td class="mono right muted">—</td>
+        <td class="mono right">${fmt(denom, 2)}</td>
+        <td class="mono right">${fmt(numer, 4)}</td>
+      </tr>
+      <tr>
+        <td colspan="4" style="text-align: right; padding-right: 10px;">S = Σ(wᵢ·sᵢ) / Σ(wᵢ) =</td>
+        <td class="mono right" style="font-size: 16px;">${fmt(S, 4)}</td>
+      </tr>
+    `;
+  }
+
+  function renderBugFormula(items, denom, numer, S, score) {
+    const weightsDesc = `P0=${bugState.weights.p0}, P1=${bugState.weights.p1}, P2=${bugState.weights.p2}`;
+    const countsDesc = items.map(it => `${it.name}: ${it.count}`).join(", ");
+    
+    bugEl.formulaBox.textContent =
+`DEFINITIONS
+  wᵢ    = weight for priority level (${weightsDesc})
+  sᵢ    = normalized score = λ^count where λ = ${bugState.decay}
+  S     = weighted average of all sᵢ values (0–1)
+  Score = final scorecard value (budget × S)
+
+CURRENT DATA
+  Bug counts: ${countsDesc}
+
+CALCULATION
+  For each priority: sᵢ = ${bugState.decay}^count
+${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.s, 4)}`).join("\n")}
+
+  Weighted average:
+    S = Σ(wᵢ × sᵢ) / Σ(wᵢ)
+    S = ${fmt(numer, 4)} / ${fmt(denom, 4)} = ${fmt(S, 4)}
+
+  Final score:
+    score = ${bugState.budget} × ${fmt(S, 4)} = ${fmt2(score)}
+`;
+  }
+
+  function renderBugChart() {
+    const ctx = bugEl.chartCanvas.getContext("2d");
+    const decay = bugState.decay;
+    
+    // Generate data points
+    const maxCount = 25;
+    const labels = Array.from({ length: maxCount + 1 }, (_, i) => i);
+    const data = labels.map(n => Math.pow(decay, n));
+    
+    if (bugChart) {
+      bugChart.data.labels = labels;
+      bugChart.data.datasets[0].data = data;
+      bugChart.data.datasets[0].label = `λ = ${decay}`;
+      bugChart.update("none");
+      return;
+    }
+    
+    bugChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label: `λ = ${decay}`,
+          data,
+          borderColor: "#93c5fd",
+          backgroundColor: "rgba(147,197,253,0.1)",
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: "top",
+            labels: { color: "#a9b4d6", font: { size: 11 } }
+          }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: "Bug count", color: "#a9b4d6" },
+            ticks: { color: "#a9b4d6" },
+            grid: { color: "rgba(255,255,255,0.06)" }
+          },
+          y: {
+            min: 0,
+            max: 1,
+            title: { display: true, text: "Score (sᵢ)", color: "#a9b4d6" },
+            ticks: { color: "#a9b4d6" },
+            grid: { color: "rgba(255,255,255,0.06)" }
+          }
+        }
+      }
+    });
+  }
+
+  // ---------- Bug Events ----------
+  bugEl.wP0.addEventListener("input", recomputeBug);
+  bugEl.wP1.addEventListener("input", recomputeBug);
+  bugEl.wP2.addEventListener("input", recomputeBug);
+  bugEl.budget.addEventListener("input", recomputeBug);
+  bugEl.decay.addEventListener("input", recomputeBug);
+  bugEl.countP0.addEventListener("input", recomputeBug);
+  bugEl.countP1.addEventListener("input", recomputeBug);
+  bugEl.countP2.addEventListener("input", recomputeBug);
+
+  // ---------- Bug Init ----------
+  function syncBugControlsFromState() {
+    bugEl.budget.value = bugState.budget;
+    bugEl.decay.value = bugState.decay;
+    bugEl.wP0.value = bugState.weights.p0;
+    bugEl.wP1.value = bugState.weights.p1;
+    bugEl.wP2.value = bugState.weights.p2;
+    bugEl.countP0.value = bugState.counts.p0;
+    bugEl.countP1.value = bugState.counts.p1;
+    bugEl.countP2.value = bugState.counts.p2;
+  }
+  
+  syncBugControlsFromState();
+  recomputeBug();
+
+  // ==========================================================================
+  // POSTMORTEMS SECTION
+  // ==========================================================================
+
+  const defaultPmState = () => ({
+    budget: 20,
+    severityWeights: { sev1: 4.0, sev2: 2.0, sev3: 1.0, sev4: 0.5 },
+    typeWeights: { postmortem: 3.0, actions: 2.0, metadata: 1.0 },
+    decay: 0.85,
+    incidents: [
+      { name: "Database outage", severity: "sev1", metadata: 0, actions: 1, postmortem: 0 },
+      { name: "API latency spike", severity: "sev2", metadata: 1, actions: 1, postmortem: 0 },
+      { name: "Payment processing delay", severity: "sev3", metadata: 2, actions: 0, postmortem: 1 }
+    ]
+  });
+
+  let pmState = savedState?.pm || defaultPmState();
+
+  // ---------- PM DOM ----------
+  const pmEl = {
+    wSev1: document.getElementById("pmWSev1"),
+    wSev2: document.getElementById("pmWSev2"),
+    wSev3: document.getElementById("pmWSev3"),
+    wSev4: document.getElementById("pmWSev4"),
+    wPostmortem: document.getElementById("pmWPostmortem"),
+    wActions: document.getElementById("pmWActions"),
+    wMetadata: document.getElementById("pmWMetadata"),
+    budget: document.getElementById("pmBudget"),
+    decay: document.getElementById("pmDecay"),
+    tbody: document.getElementById("pmTbody"),
+    addBtn: document.getElementById("addPm"),
+    scoreS: document.getElementById("pmScoreS"),
+    scoreBar: document.getElementById("pmScoreBar"),
+    score: document.getElementById("pmScore"),
+    scoreMax: document.getElementById("pmScoreMax"),
+    scoreNote: document.getElementById("pmScoreNote"),
+    aggTable: document.getElementById("pmAggTable"),
+    formulaBox: document.getElementById("pmFormulaBox"),
+  };
+
+  // ---------- Compute PM Score ----------
+  function computePmScore() {
+    const severityWeights = pmState.severityWeights;
+    const typeWeights = pmState.typeWeights;
+    const decay = pmState.decay;
+    const problemTypes = ["metadata", "actions", "postmortem"];
+    
+    // Aggregate problems by type across ALL incidents, weighted by severity
+    const weightedTotals = {};
+    problemTypes.forEach(type => {
+      weightedTotals[type] = pmState.incidents.reduce((sum, incident) => {
+        const count = incident[type] || 0;
+        const sevWeight = severityWeights[incident.severity] || 1;
+        return sum + (sevWeight * count);
+      }, 0);
+    });
+    
+    // Normalize each type's weighted total using exponential decay
+    const items = problemTypes.map(type => {
+      const weightedCount = weightedTotals[type];
+      const w = typeWeights[type];
+      const s = Math.pow(decay, weightedCount);
+      return { 
+        name: type === "metadata" ? "Missing metadata" : 
+              type === "actions" ? "Incomplete actions" : 
+              "Incomplete postmortem",
+        type, 
+        weightedCount, 
+        w, 
+        s, 
+        ws: w * s 
+      };
+    });
+    
+    const denom = items.reduce((sum, it) => sum + it.w, 0);
+    const numer = items.reduce((sum, it) => sum + it.ws, 0);
+    const S = denom > 0 ? numer / denom : 1;
+    
+    return { items, denom, numer, S, weightedTotals };
+  }
+
+  function recomputePm() {
+    // Sync state from inputs
+    pmState.severityWeights.sev1 = Number(pmEl.wSev1.value) || 4;
+    pmState.severityWeights.sev2 = Number(pmEl.wSev2.value) || 2;
+    pmState.severityWeights.sev3 = Number(pmEl.wSev3.value) || 1;
+    pmState.severityWeights.sev4 = Number(pmEl.wSev4.value) || 0.5;
+    pmState.typeWeights.postmortem = Number(pmEl.wPostmortem.value) || 3;
+    pmState.typeWeights.actions = Number(pmEl.wActions.value) || 2;
+    pmState.typeWeights.metadata = Number(pmEl.wMetadata.value) || 1;
+    pmState.budget = Number(pmEl.budget.value) || 20;
+    pmState.decay = Number(pmEl.decay.value) || 0.85;
+    
+    const { items, denom, numer, S } = computePmScore();
+    const score = pmState.budget * clamp(S, 0, 1);
+    
+    // Update KPIs
+    pmEl.scoreS.textContent = fmt(S, 4);
+    pmEl.score.textContent = fmt2(score);
+    pmEl.scoreMax.textContent = pmState.budget;
+    pmEl.scoreBar.style.width = (S * 100).toFixed(1) + "%";
+    
+    // Status note
+    const totalProblems = pmState.incidents.reduce((sum, inc) => 
+      sum + inc.metadata + inc.actions + inc.postmortem, 0);
+    pmEl.scoreNote.textContent = `${totalProblems} problems across ${pmState.incidents.length} incident(s)`;
+    
+    // Render aggregate table
+    renderPmAggTable(items, denom, numer, S);
+    
+    // Render formula
+    renderPmFormula(items, denom, numer, S, score);
+    
+    // Update sidebar
+    currentScores.pm = score;
+    currentScores.pmMax = pmState.budget;
+    updateSidebar();
+    
+    // Persist state
+    saveAllState();
+  }
+
+  function renderPmAggTable(items, denom, numer, S) {
+    const thead = pmEl.aggTable.querySelector("thead");
+    const tbody = pmEl.aggTable.querySelector("tbody");
+    const tfoot = pmEl.aggTable.querySelector("tfoot");
+    
+    thead.innerHTML = "";
+    tbody.innerHTML = "";
+    tfoot.innerHTML = "";
+    
+    if (pmState.incidents.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="muted">No incidents defined.</td></tr>`;
+      return;
+    }
+    
+    thead.innerHTML = `
+      <tr>
+        <th>Problem Type</th>
+        <th class="right">Weighted Count</th>
+        <th class="right">sᵢ</th>
+        <th class="right">wᵢ</th>
+        <th class="right">wᵢ · sᵢ</th>
+      </tr>
+    `;
+    
+    items.forEach(it => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(it.name)}</td>
+        <td class="mono right">${fmt(it.weightedCount, 2)}</td>
+        <td class="mono right">${fmt(it.s, 4)}</td>
+        <td class="mono right">${fmt(it.w, 2)}</td>
+        <td class="mono right">${fmt(it.ws, 4)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    
+    tfoot.innerHTML = `
+      <tr>
+        <td>Total</td>
+        <td class="mono right muted">—</td>
+        <td class="mono right muted">—</td>
+        <td class="mono right">${fmt(denom, 2)}</td>
+        <td class="mono right">${fmt(numer, 4)}</td>
+      </tr>
+      <tr>
+        <td colspan="4" style="text-align: right; padding-right: 10px;">S = Σ(wᵢ·sᵢ) / Σ(wᵢ) =</td>
+        <td class="mono right" style="font-size: 16px;">${fmt(S, 4)}</td>
+      </tr>
+    `;
+  }
+
+  function renderPmFormula(items, denom, numer, S, score) {
+    const sevWeightsDesc = `Sev1=${pmState.severityWeights.sev1}, Sev2=${pmState.severityWeights.sev2}, Sev3=${pmState.severityWeights.sev3}, Sev4=${pmState.severityWeights.sev4}`;
+    const typeWeightsDesc = `Postmortem=${pmState.typeWeights.postmortem}, Actions=${pmState.typeWeights.actions}, Metadata=${pmState.typeWeights.metadata}`;
+    
+    // Build incident breakdown
+    const incidentBreakdown = pmState.incidents.map(inc => {
+      const sevWeight = pmState.severityWeights[inc.severity];
+      const problems = [];
+      if (inc.metadata > 0) problems.push(`${inc.metadata} metadata`);
+      if (inc.actions > 0) problems.push(`${inc.actions} actions`);
+      if (inc.postmortem > 0) problems.push(`${inc.postmortem} postmortem`);
+      return `    ${inc.name} (${inc.severity.toUpperCase()}, weight=${sevWeight}): ${problems.join(", ") || "none"}`;
+    }).join("\n");
+    
+    pmEl.formulaBox.textContent = 
+`DEFINITIONS
+  Severity weights: ${sevWeightsDesc}
+  Problem type weights: ${typeWeightsDesc}
+  λ (decay rate) = ${pmState.decay}
+  
+  wᵢ    = weight for problem type i
+  sᵢ    = normalized score for type i = λ^(weighted count)
+  S     = weighted average of all type scores (0–1)
+  Score = final scorecard value (budget × S)
+
+HOW IT WORKS
+  1. Aggregate problems by type across all incidents:
+     weighted_count = Σ(severity_weight × problem_count)
+  
+  2. Current incidents:
+${incidentBreakdown}
+  
+  3. Weighted totals by type:
+${items.map(it => `     ${it.name}: ${fmt(it.weightedCount, 2)}`).join("\n")}
+  
+  4. Normalize each type: sᵢ = ${pmState.decay}^weighted_count
+${items.map(it => `     ${it.name}: ${fmt(it.s, 4)}`).join("\n")}
+  
+  5. Weighted average:
+     S = Σ(wᵢ × sᵢ) / Σ(wᵢ)
+     S = ${fmt(numer, 4)} / ${fmt(denom, 4)} = ${fmt(S, 4)}
+  
+  6. Final score:
+     score = ${pmState.budget} × ${fmt(S, 4)} = ${fmt2(score)}
+`;
+  }
+
+  // ---------- Render PM Table ----------
+  function renderPmTable() {
+    pmEl.tbody.innerHTML = "";
+    
+    pmState.incidents.forEach((inc, idx) => {
+      const tr = document.createElement("tr");
+      
+      tr.innerHTML = `
+        <td><input type="text" value="${escapeHtml(inc.name)}" style="width: 140px;" data-idx="${idx}" data-field="name" /></td>
+        <td>
+          <select data-idx="${idx}" data-field="severity" style="width: 70px;">
+            <option value="sev1" ${inc.severity === "sev1" ? "selected" : ""}>Sev1</option>
+            <option value="sev2" ${inc.severity === "sev2" ? "selected" : ""}>Sev2</option>
+            <option value="sev3" ${inc.severity === "sev3" ? "selected" : ""}>Sev3</option>
+            <option value="sev4" ${inc.severity === "sev4" ? "selected" : ""}>Sev4</option>
+          </select>
+        </td>
+        <td><input type="number" value="${inc.metadata}" min="0" style="width: 60px;" data-idx="${idx}" data-field="metadata" /></td>
+        <td><input type="number" value="${inc.actions}" min="0" style="width: 60px;" data-idx="${idx}" data-field="actions" /></td>
+        <td><input type="number" value="${inc.postmortem}" min="0" style="width: 60px;" data-idx="${idx}" data-field="postmortem" /></td>
+        <td><button class="btn danger" data-idx="${idx}">Remove</button></td>
+      `;
+      
+      pmEl.tbody.appendChild(tr);
+    });
+    
+    // Add event listeners
+    pmEl.tbody.querySelectorAll("input, select").forEach(inp => {
+      inp.addEventListener("input", () => {
+        const idx = Number(inp.dataset.idx);
+        const field = inp.dataset.field;
+        if (field === "name" || field === "severity") {
+          pmState.incidents[idx][field] = inp.value;
+        } else {
+          pmState.incidents[idx][field] = Number(inp.value) || 0;
+        }
+        recomputePm();
+      });
+      inp.addEventListener("change", () => {
+        const idx = Number(inp.dataset.idx);
+        const field = inp.dataset.field;
+        if (field === "name" || field === "severity") {
+          pmState.incidents[idx][field] = inp.value;
+        } else {
+          pmState.incidents[idx][field] = Number(inp.value) || 0;
+        }
+        recomputePm();
+      });
+    });
+    
+    pmEl.tbody.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.dataset.idx);
+        pmState.incidents.splice(idx, 1);
+        renderPmTable();
+        recomputePm();
+      });
+    });
+  }
+
+  // ---------- PM Events ----------
+  pmEl.wSev1.addEventListener("input", recomputePm);
+  pmEl.wSev2.addEventListener("input", recomputePm);
+  pmEl.wSev3.addEventListener("input", recomputePm);
+  pmEl.wSev4.addEventListener("input", recomputePm);
+  pmEl.wPostmortem.addEventListener("input", recomputePm);
+  pmEl.wActions.addEventListener("input", recomputePm);
+  pmEl.wMetadata.addEventListener("input", recomputePm);
+  pmEl.budget.addEventListener("input", recomputePm);
+  pmEl.decay.addEventListener("input", recomputePm);
+
+  const incidentNameInventory = [
+    "Database outage",
+    "API latency spike",
+    "Payment processing delay",
+    "Memory leak in production",
+    "CDN failover incident",
+    "Authentication service down",
+    "Data replication lag",
+    "Cache invalidation issue",
+    "Deployment rollback",
+    "Network partition",
+    "Disk space exhaustion",
+    "Rate limit breach",
+    "Third-party API timeout",
+    "SSL certificate expiration",
+    "Load balancer misconfiguration"
+  ];
+
+  pmEl.addBtn.addEventListener("click", () => {
+    const usedNames = new Set(pmState.incidents.map(i => i.name));
+    const available = incidentNameInventory.filter(n => !usedNames.has(n));
+    const name = available.length > 0 
+      ? available[Math.floor(Math.random() * available.length)]
+      : `Incident ${pmState.incidents.length + 1}`;
+    
+    const severities = ["sev1", "sev2", "sev3", "sev4"];
+    const severity = severities[Math.floor(Math.random() * severities.length)];
+    
+    pmState.incidents.push({
+      name,
+      severity,
+      metadata: Math.floor(Math.random() * 3),
+      actions: Math.floor(Math.random() * 3),
+      postmortem: Math.random() > 0.7 ? 1 : 0
+    });
+    renderPmTable();
+    recomputePm();
+  });
+
+  // ---------- PM Init ----------
+  function syncPmControlsFromState() {
+    pmEl.budget.value = pmState.budget;
+    pmEl.decay.value = pmState.decay;
+    pmEl.wSev1.value = pmState.severityWeights.sev1;
+    pmEl.wSev2.value = pmState.severityWeights.sev2;
+    pmEl.wSev3.value = pmState.severityWeights.sev3;
+    pmEl.wSev4.value = pmState.severityWeights.sev4;
+    pmEl.wPostmortem.value = pmState.typeWeights.postmortem;
+    pmEl.wActions.value = pmState.typeWeights.actions;
+    pmEl.wMetadata.value = pmState.typeWeights.metadata;
+  }
+  
+  syncPmControlsFromState();
+  renderPmTable();
+  recomputePm();
+</script>
+</body>
+</html>
