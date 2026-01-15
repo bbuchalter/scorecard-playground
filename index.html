@@ -54,6 +54,7 @@
       margin: 0 0 24px;
       color: var(--text);
       letter-spacing: .2px;
+      text-align: center;
     }
 
     .sidebar-title {
@@ -1970,7 +1971,7 @@ CALCULATION
     images: [
       { name: "api-server", critical: 2, high: 5, medium: 12, low: 34 },
       { name: "worker", critical: 0, high: 1, medium: 3, low: 8 },
-      { name: "frontend", critical: 1, high: 0, medium: 2, low: 15 }
+      { name: "frontend", critical: 2, high: 0, medium: 2, low: 15 }
     ]
   });
 
@@ -2600,7 +2601,7 @@ CALCULATION
     budget: 20,
     weights: { p0: 4.0, p1: 2.0, p2: 1.0 },
     decay: 0.85,
-    counts: { p0: 1, p1: 3, p2: 8 }
+    counts: { p0: 0, p1: 0, p2: 8 }
   });
 
   let bugState = savedState?.bug || defaultBugState();
