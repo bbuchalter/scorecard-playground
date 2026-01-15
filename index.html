@@ -632,6 +632,21 @@
       margin-bottom: 28px;
       position: relative;
       overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .welcome-hero-left {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .welcome-hero-right {
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .welcome-hero::before {
@@ -758,15 +773,14 @@
     }
 
     .welcome-video {
-      margin: 24px 0;
       border-radius: 12px;
       overflow: hidden;
       border: 1px solid var(--border);
       box-shadow: 0 10px 40px rgba(0,0,0,.4);
       position: relative;
-      padding-bottom: 56.25%; /* 16:9 aspect ratio */
+      padding-bottom: 56.25%; /* 16:9 aspect ratio for YouTube */
       height: 0;
-      max-width: 640px;
+      width: 100%;
     }
 
     .welcome-video iframe {
@@ -776,6 +790,15 @@
       width: 100%;
       height: 100%;
       border-radius: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .welcome-hero {
+        grid-template-columns: 1fr;
+      }
+      .welcome-hero-right {
+        order: -1;
+      }
     }
 
     @media (max-width: 600px) {
@@ -788,9 +811,6 @@
       .welcome-features {
         grid-template-columns: 1fr;
       }
-      .welcome-video {
-        margin: 20px 0;
-      }
     }
   </style>
 </head>
@@ -798,7 +818,7 @@
   <div class="page-layout">
     <!-- Sidebar -->
     <aside class="sidebar">
-      <h1 class="sidebar-main-title">Scorecard Playground</h1>
+      <h1 class="sidebar-main-title">Team Scorecard</h1>
 
       <!-- Overall Score Summary -->
       <div class="score-summary">
@@ -869,59 +889,63 @@
     <div class="wrap">
       <!-- Welcome Introduction -->
       <div class="welcome-hero">
-        <div class="welcome-badge">✦ Interactive Playground</div>
-        <h1 class="welcome-title">Design your team's health scorecard</h1>
-        <p class="welcome-desc">
-          This playground lets you experiment with different scoring models for measuring team and service health. 
-          Adjust weights, thresholds, and normalization methods to see how they affect final scores in real-time.
-        </p>
-        
-        <div class="welcome-video">
-          <iframe 
-            width="560" 
-            height="315" 
-            src="https://www.youtube.com/embed/605fxputDxM?rel=0&modestbranding=1" 
-            title="Scorecard Playground Introduction" 
-            frameborder="0" 
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            referrerpolicy="strict-origin-when-cross-origin"
-            allowfullscreen>
-          </iframe>
+        <div class="welcome-hero-left">
+          <h1 class="welcome-title">Design your team's health scorecard</h1>
+          <p class="welcome-desc">
+            This playground lets you experiment with different scoring models for measuring team and service health. 
+            Adjust weights, thresholds, and normalization methods to see how they affect final scores in real-time.
+          </p>
+          
+          <div class="welcome-features">
+            <div class="welcome-feature">
+              <span class="feature-icon">⚡</span>
+              <div class="feature-text">
+                <strong>Live calculations</strong>
+                <span>See scores update instantly as you tweak inputs</span>
+              </div>
+            </div>
+            <div class="welcome-feature">
+              <span class="feature-icon">🎛️</span>
+              <div class="feature-text">
+                <strong>Configurable weights</strong>
+                <span>Prioritize what matters most to your team</span>
+              </div>
+            </div>
+            <div class="welcome-feature">
+              <span class="feature-icon">📊</span>
+              <div class="feature-text">
+                <strong>Multiple categories</strong>
+                <span>SLOs, vulnerabilities, bugs, and postmortems</span>
+              </div>
+            </div>
+            <div class="welcome-feature">
+              <span class="feature-icon">💾</span>
+              <div class="feature-text">
+                <strong>Auto-saved state</strong>
+                <span>Your experiments persist across sessions</span>
+              </div>
+            </div>
+          </div>
+
+          <p class="welcome-hint">
+            <span class="hint-arrow">↓</span> Scroll down to explore each scoring category, or use the sidebar to jump to a specific section.
+          </p>
         </div>
 
-        <div class="welcome-features">
-          <div class="welcome-feature">
-            <span class="feature-icon">⚡</span>
-            <div class="feature-text">
-              <strong>Live calculations</strong>
-              <span>See scores update instantly as you tweak inputs</span>
-            </div>
-          </div>
-          <div class="welcome-feature">
-            <span class="feature-icon">🎛️</span>
-            <div class="feature-text">
-              <strong>Configurable weights</strong>
-              <span>Prioritize what matters most to your team</span>
-            </div>
-          </div>
-          <div class="welcome-feature">
-            <span class="feature-icon">📊</span>
-            <div class="feature-text">
-              <strong>Multiple categories</strong>
-              <span>SLOs, vulnerabilities, bugs, and postmortems</span>
-            </div>
-          </div>
-          <div class="welcome-feature">
-            <span class="feature-icon">💾</span>
-            <div class="feature-text">
-              <strong>Auto-saved state</strong>
-              <span>Your experiments persist across sessions</span>
-            </div>
+        <div class="welcome-hero-right">
+          <div class="welcome-video">
+            <iframe 
+              width="560" 
+              height="315" 
+              src="https://www.youtube.com/embed/605fxputDxM?rel=0&modestbranding=1" 
+              title="Scorecard Playground Introduction" 
+              frameborder="0" 
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerpolicy="strict-origin-when-cross-origin"
+              allowfullscreen>
+            </iframe>
           </div>
         </div>
-        <p class="welcome-hint">
-          <span class="hint-arrow">↓</span> Scroll down to explore each scoring category, or use the sidebar to jump to a specific section.
-        </p>
       </div>
 
       <h2 class="section-title" id="section-slos">SLOs</h2>
@@ -980,7 +1004,7 @@
         <div class="config-group" style="margin-top: 14px;">
           <div class="config-label">Score budget</div>
           <div class="row">
-            <input id="pointBudget" type="number" min="0" max="100" step="1" value="20" style="width: 80px;" />
+            <input id="pointBudget" type="number" min="0" max="100" step="1" value="35" style="width: 80px;" />
             <span class="muted">/100 (global)</span>
           </div>
         </div>
@@ -1126,7 +1150,7 @@
         <div class="config-group" style="margin-top: 14px;">
           <div class="config-label">Score budget</div>
           <div class="row">
-            <input id="vulnBudget" type="number" min="0" max="100" step="1" value="20" style="width: 80px;" />
+            <input id="vulnBudget" type="number" min="0" max="100" step="1" value="30" style="width: 80px;" />
             <span class="muted">/100 (global)</span>
         </div>
       </div>
@@ -1407,7 +1431,7 @@
 
         <div class="config-group" style="margin-top: 14px;">
           <span class="config-label">Score budget</span>
-          <input type="number" id="pmBudget" min="1" step="1" value="20" style="width:70px">
+          <input type="number" id="pmBudget" min="1" step="1" value="15" style="width:70px">
         </div>
 
         <div class="config-group" style="margin-top: 14px;">
@@ -1512,7 +1536,7 @@
 
   // ---------- State ----------
   const defaultState = () => ({
-    pointBudget: 20,
+    pointBudget: 35,
     tierWeights: { p0: 2.0, p1: 1.0, p2: 0.5 },
     slos: [
       { name: "Checkout latency", ebPct: 60, tier: "p1" },
@@ -1520,6 +1544,15 @@
       { name: "Job success rate", ebPct: 90, tier: "p2" }
     ]
   });
+
+  // Check for reset query param
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('reset') === '1') {
+    localStorage.removeItem(STORAGE_KEY);
+    // Remove the query param from URL without reload
+    const cleanUrl = window.location.pathname + window.location.hash;
+    window.history.replaceState({}, document.title, cleanUrl);
+  }
 
   // Load saved state or use defaults
   const savedState = loadAllState();
@@ -1923,7 +1956,7 @@ CALCULATION
 
   // ---------- Vuln State ----------
   const defaultVulnState = () => ({
-    budget: 20,
+    budget: 30,
     weights: { critical: 4.0, high: 2.0, medium: 1.0, low: 0.5 },
     method: "exponential",
     params: {
@@ -2829,7 +2862,7 @@ ${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.
   // ==========================================================================
 
   const defaultPmState = () => ({
-    budget: 20,
+    budget: 15,
     severityWeights: { sev1: 4.0, sev2: 2.0, sev3: 1.0, sev4: 0.5 },
     typeWeights: { postmortem: 3.0, actions: 2.0, metadata: 1.0 },
     decay: 0.85,
