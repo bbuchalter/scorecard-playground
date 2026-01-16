@@ -228,6 +228,83 @@
     .category-bar.warn > div { background: var(--warn); }
     .category-bar.bad > div { background: var(--bad); }
 
+    /* Priority work list */
+    .priority-work {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .priority-items {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .priority-item {
+      display: block;
+      text-decoration: none;
+      padding: 10px;
+      margin: 0 -10px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.08);
+      transition: all .15s;
+    }
+
+    .priority-item:hover {
+      background: rgba(255,255,255,.06);
+      border-color: rgba(255,255,255,.12);
+      transform: translateX(2px);
+    }
+
+    .priority-item-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .priority-item-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .priority-item-category {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--muted);
+    }
+
+    .priority-item-opportunity {
+      margin-left: auto;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--good);
+    }
+
+    .priority-item-name {
+      font-size: 12px;
+      color: var(--text);
+      line-height: 1.4;
+      padding-left: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .priority-empty {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      padding: 16px 0;
+    }
+
     .wrap {
       flex: 1;
       min-width: 0;
@@ -884,6 +961,14 @@
         <div class="category-score" id="sidebarPmScore">— / —</div>
         <div class="category-bar" id="sidebarPmBar"><div></div></div>
       </a>
+
+      <!-- Priority Work List -->
+      <div class="priority-work">
+        <h3 class="sidebar-title">Priority Work</h3>
+        <div id="priorityItems" class="priority-items">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
     </aside>
 
     <!-- Main content -->
@@ -961,26 +1046,27 @@
       <p>
         <strong>Error budget remaining (EB%)</strong> tells you how much of that budget you've used. 
         100% means you haven't used any budget (perfect reliability). 
-        0% means you've exhausted your budget (too many failures).
-      </p>
-      <p>
-        <strong>Negative error budgets</strong> occur when you've exceeded your error budget—you've had more 
-        failures than your SLO allows. For example, if your 99.9% availability target allows 43 minutes of 
-        downtime per month, but you've had 60 minutes, your EB% would be approximately -40%. 
-        Negative values indicate you're "in the red" and need to prioritize reliability improvements.
+        0% means you've exhausted your budget exactly (meeting your target). 
+        <strong>Negative EB%</strong> means you've exceeded your error budget—more failures than your SLO allows.
       </p>
       
       <h4>Key design decisions</h4>
       <ul>
         <li>
-          <strong>Normalization is straightforward.</strong>
-          Since EB% is already a percentage (0–100), we simply divide by 100 to get a 0–1 score. 
-          Negative values are clamped to 0 (no credit for being in debt).
+          <strong>Meeting your SLO = full points.</strong>
+          Any SLO with EB% >= 0 receives a perfect normalized score of 1.0. 
+          There's no additional reward for "overperforming" (e.g., 99.99% vs 99.9%). 
+          This reflects the philosophy that meeting your SLO is the goal.
+        </li>
+        <li>
+          <strong>Penalty for negative error budgets.</strong>
+          When EB% < 0, a penalty is applied using a normalization function (exponential decay, linear, etc.). 
+          The magnitude of the negative EB% determines the penalty—e.g., -5% gets a small penalty, -40% gets a large penalty.
         </li>
         <li>
           <strong>Weight by tier.</strong>
           SLOs are assigned tiers (p0, p1, p2) reflecting their importance. 
-          A p0 (critical) SLO with low or negative error budget remaining drags the score down more than a p2.
+          A p0 (critical) SLO with negative EB% drags the score down more than a p2.
         </li>
         <li>
           <strong>Weighted average.</strong>
@@ -988,9 +1074,37 @@
           where each SLO contributes proportionally to its weight.
         </li>
       </ul>
+
+      <h4>Recommendation: Exponential decay (λ = 0.85)</h4>
+      <p>
+        We recommend <strong>exponential decay</strong> with a decay rate of <strong>0.85</strong> for penalizing negative EB%. 
+        This means each percentage point of negative error budget multiplies your score by 0.85.
+      </p>
+      <p><strong>Why percentage points as the unit?</strong></p>
+      <ul style="margin-top: 8px; font-size: 13px;">
+        <li>
+          <strong>Already normalized:</strong> EB% is inherently a ratio—it compares your actual error budget 
+          consumption to your allowed budget. A -10% EB means you've exceeded your budget by 10% of the total, 
+          regardless of whether that's a 99.9% or 99% SLO. This makes the penalty comparable across different SLOs.
+        </li>
+        <li>
+          <strong>Interpretable scale:</strong> One percentage point represents a meaningful operational violation. 
+          For a 30-day SLO with a 99.9% target (43.2 minutes allowed downtime), each -1% EB represents roughly 
+          25 additional minutes of downtime. This is a concrete, actionable unit.
+        </li>
+        <li>
+          <strong>Balanced sensitivity:</strong> Using the raw magnitude (-10 becomes count=10) provides reasonable 
+          granularity. Going to -5% EB is noticeably worse than -3%, but not catastrophically so. 
+          Using finer units (e.g., 0.1% increments) would make the penalty curve too harsh; 
+          coarser units (e.g., 10% increments) would be too forgiving.
+        </li>
+      </ul>
+      <p class="muted" style="margin-top: 8px;">
+        With λ = 0.85: -1% EB → 0.85, -3% EB → 0.61, -5% EB → 0.44, -10% EB → 0.20, -20% EB → 0.04
+      </p>
       
       <p class="muted" style="margin-bottom: 0;">
-        Adjust tier weights and SLO inputs below to see how they affect the final score. Try negative EB% values to simulate exhausted budgets.
+        Adjust tier weights, normalization method, and SLO inputs below to see how they affect the final score.
       </p>
     </div>
 
@@ -1013,6 +1127,34 @@
           <div class="row">
             <input id="pointBudget" type="number" min="0" max="100" step="1" value="35" style="width: 80px;" />
             <span class="muted">/100 (global)</span>
+          </div>
+        </div>
+
+        <div class="config-group" style="margin-top: 14px;">
+          <div class="config-label">Normalization method</div>
+          <select id="sloMethod" style="width: 100%; max-width: 300px;">
+            <option value="exponential">Exponential decay</option>
+            <option value="linear">Linear threshold</option>
+            <option value="inverse">Inverse (hyperbolic)</option>
+            <option value="logarithmic">Logarithmic</option>
+            <option value="sigmoid">Sigmoid (S-curve)</option>
+            <option value="bucket">Bucket / Step function</option>
+          </select>
+        </div>
+
+        <div class="method-params" id="sloMethodParams">
+          <!-- Dynamically populated based on selected method -->
+        </div>
+
+        <div class="chart-container" style="margin-top: 14px;">
+          <div class="config-label" style="margin-bottom: 8px;">Normalization curve</div>
+          <div style="position: relative; height: 200px;">
+            <canvas id="sloChart"></canvas>
+          </div>
+          <div class="row" style="margin-top: 8px; gap: 8px;">
+            <label style="font-size: 12px;">
+              <input type="checkbox" id="sloShowAllMethods" /> Show all methods
+            </label>
           </div>
         </div>
         </div>
@@ -1553,6 +1695,244 @@
   const fmt = (x, d=4) => Number.isFinite(x) ? x.toFixed(d) : "NaN";
   const fmt2 = (x) => Number.isFinite(x) ? x.toFixed(2) : "NaN";
 
+  // ---------- Normalization Methods (Shared across all categories) ----------
+  const normMethods = {
+    exponential: {
+      name: "Exponential decay",
+      calc: (count, params) => Math.pow(params.decay, count),
+      formula: (params) => `sᵢ = ${params.decay}^count`,
+      examples: (params) => {
+        const d = params.decay;
+        return `0 → 1.00, 1 → ${fmt2(Math.pow(d,1))}, 3 → ${fmt2(Math.pow(d,3))}, 5 → ${fmt2(Math.pow(d,5))}, 10 → ${fmt2(Math.pow(d,10))}`;
+      }
+    },
+    linear: {
+      name: "Linear threshold",
+      calc: (count, params) => Math.max(0, 1 - count / params.threshold),
+      formula: (params) => `sᵢ = max(0, 1 - count / ${params.threshold})`,
+      examples: (params) => {
+        const t = params.threshold;
+        return `0 → 1.00, ${Math.floor(t/2)} → ${fmt2(0.5)}, ${t} → 0.00, ${t+5} → 0.00`;
+      }
+    },
+    inverse: {
+      name: "Inverse (hyperbolic)",
+      calc: (count, params) => 1 / (1 + params.k * count),
+      formula: (params) => `sᵢ = 1 / (1 + ${params.k} × count)`,
+      examples: (params) => {
+        const k = params.k;
+        const f = c => 1 / (1 + k * c);
+        return `0 → 1.00, 1 → ${fmt2(f(1))}, 3 → ${fmt2(f(3))}, 5 → ${fmt2(f(5))}, 10 → ${fmt2(f(10))}`;
+      }
+    },
+    logarithmic: {
+      name: "Logarithmic",
+      calc: (count, params) => Math.max(0, 1 - Math.log(1 + count) / Math.log(1 + params.maxExpected)),
+      formula: (params) => `sᵢ = max(0, 1 - log(1+count) / log(1+${params.maxExpected}))`,
+      examples: (params) => {
+        const m = params.maxExpected;
+        const f = c => Math.max(0, 1 - Math.log(1+c) / Math.log(1+m));
+        return `0 → 1.00, 1 → ${fmt2(f(1))}, 5 → ${fmt2(f(5))}, ${m} → 0.00`;
+      }
+    },
+    sigmoid: {
+      name: "Sigmoid (S-curve)",
+      calc: (count, params) => 1 / (1 + Math.exp(params.steepness * (count - params.midpoint))),
+      formula: (params) => `sᵢ = 1 / (1 + e^(${params.steepness} × (count - ${params.midpoint})))`,
+      examples: (params) => {
+        const f = c => 1 / (1 + Math.exp(params.steepness * (c - params.midpoint)));
+        return `0 → ${fmt2(f(0))}, ${params.midpoint} → 0.50, ${params.midpoint * 2} → ${fmt2(f(params.midpoint * 2))}`;
+      }
+    },
+    bucket: {
+      name: "Bucket / Step function",
+      calc: (count, params) => {
+        const buckets = params.buckets; // [[threshold, score], ...]
+        let score = 1.0;
+        for (const [thresh, s] of buckets) {
+          if (count >= thresh) score = s;
+        }
+        return score;
+      },
+      formula: (params) => `Step function with ${params.buckets.length} buckets`,
+      examples: (params) => {
+        return params.buckets.map(([t, s]) => `${t}+ → ${fmt2(s)}`).join(", ");
+      }
+    }
+  };
+
+  // Method colors for charts
+  const methodColors = {
+    exponential: { border: "#6ee7b7", bg: "rgba(110,231,183,0.1)" },
+    linear: { border: "#fb7185", bg: "rgba(251,113,133,0.1)" },
+    inverse: { border: "#93c5fd", bg: "rgba(147,197,253,0.1)" },
+    logarithmic: { border: "#fde68a", bg: "rgba(253,230,138,0.1)" },
+    sigmoid: { border: "#c4b5fd", bg: "rgba(196,181,253,0.1)" },
+    bucket: { border: "#fdba74", bg: "rgba(253,186,116,0.1)" }
+  };
+
+  // ---------- Opportunity Calculation ----------
+  // Calculate opportunities for each item across all categories
+  // Returns array of {category, name, opportunity, categoryColor, itemId} sorted by opportunity descending
+  function calculateOpportunities() {
+    const opportunities = [];
+    
+    // Helper to compute SLO score with modified data
+    function computeSloScoreWithData(slos, method, params, tierWeights) {
+      const normMethod = normMethods[method];
+      const items = slos.map(slo => {
+        const ebPct = Number(slo.ebPct);
+        const negativeAmount = Math.max(0, -ebPct);
+        const s = ebPct >= 0 ? 1.0 : normMethod.calc(negativeAmount, params);
+        const w = Math.max(0, tierWeights[slo.tier] ?? 1.0);
+        const ws = w * s;
+        return { s, w, ws };
+      });
+      const denom = items.reduce((acc, it) => acc + it.w, 0);
+      const numer = items.reduce((acc, it) => acc + it.ws, 0);
+      const S = (denom > 0 && items.length > 0) ? (numer / denom) : 1.0;
+      return S;
+    }
+
+    // SLOs: Fix = set EB% to 0
+    try {
+      if (typeof state !== 'undefined' && state.slos) {
+        const currentS = computeSloScoreWithData(state.slos, state.method, state.params[state.method], state.tierWeights);
+        const currentScore = state.pointBudget * clamp(currentS, 0, 1);
+        
+        state.slos.forEach((slo, idx) => {
+          if (slo.ebPct < 0) {  // Only consider SLOs with negative EB%
+            const fixedSlos = state.slos.map((s, i) => 
+              i === idx ? { ...s, ebPct: 0 } : s
+            );
+            const fixedS = computeSloScoreWithData(fixedSlos, state.method, state.params[state.method], state.tierWeights);
+            const fixedScore = state.pointBudget * clamp(fixedS, 0, 1);
+            const opportunity = fixedScore - currentScore;
+            
+            if (opportunity > 0.01) {  // Only include if meaningful opportunity
+              opportunities.push({
+                category: 'SLOs',
+                categoryColor: '#93c5fd',
+                name: slo.name,
+                opportunity: opportunity,
+                itemId: `slo-${idx}`,
+                link: `#slo-row-${idx}`
+              });
+            }
+          }
+        });
+      }
+    } catch (e) {
+      // SLO state not yet initialized, skip
+    }
+    
+    // Vulns: Fix = set all counts to 0 for that image
+    try {
+      if (typeof window.vulnState !== 'undefined' && window.vulnState && window.vulnState.images && typeof window.computeVulnScore === 'function') {
+        const vulnState = window.vulnState;
+        const computeVulnScore = window.computeVulnScore;
+      const currentResult = computeVulnScore(vulnState.method, vulnState.params[vulnState.method]);
+      const currentScore = vulnState.budget * clamp(currentResult.S, 0, 1);
+      
+      vulnState.images.forEach((image, idx) => {
+        const totalVulns = image.critical + image.high + image.medium + image.low;
+        if (totalVulns > 0) {
+          const savedImages = [...vulnState.images];
+          vulnState.images = vulnState.images.map((img, i) =>
+            i === idx ? { ...img, critical: 0, high: 0, medium: 0, low: 0 } : img
+          );
+          const fixedResult = computeVulnScore(vulnState.method, vulnState.params[vulnState.method]);
+          const fixedScore = vulnState.budget * clamp(fixedResult.S, 0, 1);
+          vulnState.images = savedImages;
+          
+          const opportunity = fixedScore - currentScore;
+          if (opportunity > 0.01) {
+            opportunities.push({
+              category: 'Vulns',
+              categoryColor: '#fb7185',
+              name: image.name,
+              opportunity: opportunity,
+              itemId: `vuln-${idx}`,
+              link: `#vuln-row-${idx}`
+            });
+          }
+        }
+      });
+      }
+    } catch (e) {
+      // Vuln state not yet initialized, skip
+    }
+    
+    // Bugs: Fix = remove the ticket
+    try {
+      if (typeof window.bugState !== 'undefined' && window.bugState && window.bugState.tickets && typeof window.computeBugScore === 'function') {
+        const bugState = window.bugState;
+        const computeBugScore = window.computeBugScore;
+        const currentResult = computeBugScore(bugState.method, bugState.params[bugState.method]);
+        const currentScore = bugState.budget * clamp(currentResult.S, 0, 1);
+        
+        bugState.tickets.forEach((ticket, idx) => {
+          const savedTickets = [...bugState.tickets];
+          bugState.tickets = bugState.tickets.filter((_, i) => i !== idx);
+          const fixedResult = computeBugScore(bugState.method, bugState.params[bugState.method]);
+          const fixedScore = bugState.budget * clamp(fixedResult.S, 0, 1);
+          bugState.tickets = savedTickets;
+          
+          const opportunity = fixedScore - currentScore;
+          if (opportunity > 0.01) {
+            opportunities.push({
+              category: 'Bugs',
+              categoryColor: '#fde68a',
+              name: ticket.name,
+              opportunity: opportunity,
+              itemId: `bug-${idx}`,
+              link: `#bug-row-${idx}`
+            });
+          }
+        });
+      }
+    } catch (e) {
+      // Bug state not yet initialized, skip
+    }
+    
+    // Postmortems: Fix = remove the problem
+    try {
+      if (typeof window.pmState !== 'undefined' && window.pmState && window.pmState.problems && typeof window.computePmScore === 'function') {
+        const pmState = window.pmState;
+        const computePmScore = window.computePmScore;
+        const currentResult = computePmScore(pmState.method, pmState.params[pmState.method]);
+        const currentScore = pmState.budget * clamp(currentResult.S, 0, 1);
+        
+        pmState.problems.forEach((problem, idx) => {
+          const savedProblems = [...pmState.problems];
+          pmState.problems = pmState.problems.filter((_, i) => i !== idx);
+          const fixedResult = computePmScore(pmState.method, pmState.params[pmState.method]);
+          const fixedScore = pmState.budget * clamp(fixedResult.S, 0, 1);
+          pmState.problems = savedProblems;
+          
+          const opportunity = fixedScore - currentScore;
+          if (opportunity > 0.01) {
+            opportunities.push({
+              category: 'Postmortems',
+              categoryColor: '#c4b5fd',
+              name: problem.incident + ': ' + problem.description,
+              opportunity: opportunity,
+              itemId: `pm-${idx}`,
+              link: `#pm-row-${idx}`
+            });
+          }
+        });
+      }
+    } catch (e) {
+      // Postmortem state not yet initialized, skip
+    }
+    
+    // Sort by opportunity descending
+    opportunities.sort((a, b) => b.opportunity - a.opportunity);
+    
+    return opportunities;
+  }
+
   // ---------- LocalStorage Persistence ----------
   const STORAGE_KEY = "scorecard-playground-state";
   let allSectionsInitialized = false;
@@ -1588,6 +1968,15 @@
   const defaultState = () => ({
     pointBudget: 35,
     tierWeights: { p0: 2.0, p1: 1.0, p2: 0.5 },
+    method: "exponential",
+    params: {
+      exponential: { decay: 0.85 },
+      linear: { threshold: 10 },
+      inverse: { k: 1.0 },
+      logarithmic: { maxExpected: 20 },
+      sigmoid: { midpoint: 5, steepness: 1.0 },
+      bucket: { buckets: [[0, 1.0], [1, 0.8], [3, 0.5], [6, 0.2], [11, 0.0]] }
+    },
     slos: [
       { name: "Checkout latency", ebPct: 60, tier: "p1" },
       { name: "API availability", ebPct: 80, tier: "p0" },
@@ -1616,6 +2005,10 @@
     wP0: document.getElementById("wP0"),
     wP1: document.getElementById("wP1"),
     wP2: document.getElementById("wP2"),
+    method: document.getElementById("sloMethod"),
+    methodParams: document.getElementById("sloMethodParams"),
+    chartCanvas: document.getElementById("sloChart"),
+    showAllMethods: document.getElementById("sloShowAllMethods"),
     addSlo: document.getElementById("addSlo"),
     sloTbody: document.getElementById("sloTbody"),
     scoreS: document.getElementById("scoreS"),
@@ -1656,6 +2049,8 @@
     pmScore: document.getElementById("sidebarPmScore"),
     pmPct: document.getElementById("sidebarPmPct"),
     pmBar: document.getElementById("sidebarPmBar"),
+    // Priority work
+    priorityItems: document.getElementById("priorityItems"),
   };
 
   // Store current scores for sidebar
@@ -1747,6 +2142,26 @@
       sidebarEl.pmBar.className = "category-bar " + getScoreClass(pmPct);
       sidebarEl.pmBar.querySelector("div").style.width = (pmPct * 100).toFixed(1) + "%";
     }
+    
+    // Update priority work list
+    const opportunities = calculateOpportunities();
+    const maxToShow = 10;
+    const topOpportunities = opportunities.slice(0, maxToShow);
+    
+    if (topOpportunities.length === 0) {
+      sidebarEl.priorityItems.innerHTML = '<div class="priority-empty">✓ All items at max score!</div>';
+    } else {
+      sidebarEl.priorityItems.innerHTML = topOpportunities.map(opp => `
+        <a href="${opp.link}" class="priority-item">
+          <div class="priority-item-header">
+            <span class="priority-item-dot" style="background: ${opp.categoryColor};"></span>
+            <span class="priority-item-category">${opp.category}</span>
+            <span class="priority-item-opportunity">+${fmt2(opp.opportunity)} pts</span>
+          </div>
+          <div class="priority-item-name">${escapeHtml(opp.name)}</div>
+        </a>
+      `).join('');
+    }
   }
 
 
@@ -1760,6 +2175,7 @@
 
     state.slos.forEach((slo, idx) => {
       const tr = document.createElement("tr");
+      tr.id = `slo-row-${idx}`;  // Add unique ID for direct linking
 
       // Name
       const tdName = document.createElement("td");
@@ -1865,20 +2281,251 @@
     `;
   }
 
+  // Chart instance for SLO normalization
+  let sloChart = null;
+
+  // ---------- Render SLO Chart ----------
+  function renderSloChart() {
+    const showAll = el.showAllMethods.checked;
+    const currentMethod = state.method;
+    const maxCount = 25;
+    
+    const labels = Array.from({ length: maxCount + 1 }, (_, i) => i);
+    const datasets = [];
+    
+    if (showAll) {
+      Object.entries(normMethods).forEach(([key, methodInfo]) => {
+        const params = state.params[key];
+        const data = labels.map(count => methodInfo.calc(count, params));
+        const isSelected = key === currentMethod;
+        
+        datasets.push({
+          label: methodInfo.name,
+          data: data,
+          borderColor: methodColors[key].border,
+          backgroundColor: isSelected ? methodColors[key].bg : "transparent",
+          borderWidth: isSelected ? 3 : 1.5,
+          pointRadius: 0,
+          tension: key === "bucket" ? 0 : 0.3,
+          stepped: key === "bucket" ? "before" : false,
+          fill: isSelected,
+          order: isSelected ? 0 : 1
+        });
+      });
+    } else {
+      const params = state.params[currentMethod];
+      const methodInfo = normMethods[currentMethod];
+      const data = labels.map(count => methodInfo.calc(count, params));
+      
+      datasets.push({
+        label: methodInfo.name,
+        data: data,
+        borderColor: methodColors[currentMethod].border,
+        backgroundColor: methodColors[currentMethod].bg,
+        borderWidth: 3,
+        pointRadius: 0,
+        tension: currentMethod === "bucket" ? 0 : 0.3,
+        stepped: currentMethod === "bucket" ? "before" : false,
+        fill: true
+      });
+    }
+    
+    if (sloChart) {
+      sloChart.data.labels = labels;
+      sloChart.data.datasets = datasets;
+      sloChart.options.plugins.legend.display = showAll;
+      sloChart.update("none");
+    } else {
+      sloChart = new Chart(el.chartCanvas, {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            intersect: false,
+            mode: "index"
+          },
+          plugins: {
+            legend: {
+              display: showAll,
+              position: "bottom",
+              labels: {
+                color: "#a9b4d6",
+                font: { size: 11 },
+                boxWidth: 12,
+                padding: 8
+              }
+            },
+            tooltip: {
+              backgroundColor: "rgba(17,25,53,0.95)",
+              titleColor: "#e9eefc",
+              bodyColor: "#a9b4d6",
+              borderColor: "rgba(255,255,255,0.1)",
+              borderWidth: 1,
+              padding: 10,
+              callbacks: {
+                title: (items) => `Negative EB%: ${items[0].label}`,
+                label: (item) => `${item.dataset.label}: ${item.parsed.y.toFixed(4)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: "Negative Error Budget %",
+                color: "#a9b4d6",
+                font: { size: 11 }
+              },
+              ticks: { color: "#a9b4d6", font: { size: 10 } },
+              grid: { color: "rgba(255,255,255,0.06)" }
+            },
+            y: {
+              min: 0,
+              max: 1,
+              title: {
+                display: true,
+                text: "Normalized Score (sᵢ)",
+                color: "#a9b4d6",
+                font: { size: 11 }
+              },
+              ticks: { color: "#a9b4d6", font: { size: 10 } },
+              grid: { color: "rgba(255,255,255,0.06)" }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  // ---------- Render SLO Method Params ----------
+  function renderSloMethodParams() {
+    // Ensure method is set (handle old saved state)
+    if (!state.method || !state.params || !state.params[state.method]) {
+      state.method = "exponential";
+      if (!state.params) {
+        state.params = {
+          exponential: { decay: 0.85 },
+          linear: { threshold: 10 },
+          inverse: { k: 1.0 },
+          logarithmic: { maxExpected: 20 },
+          sigmoid: { midpoint: 5, steepness: 1.0 },
+          bucket: { buckets: [[0, 1.0], [1, 0.8], [3, 0.5], [6, 0.2], [11, 0.0]] }
+        };
+      }
+    }
+    
+    const method = state.method;
+    const params = state.params[method];
+    const methodInfo = normMethods[method];
+    
+    let html = "";
+    
+    if (method === "exponential") {
+      html = `
+        <div class="param-row">
+          <label>Decay rate (λ)
+            <input type="number" step="0.01" min="0" max="1" value="${params.decay}" 
+                   oninput="state.params.exponential.decay = Number(this.value); recompute(); renderSloChart();" />
+          </label>
+          <div class="muted" style="font-size: 12px;">Lower = harsher penalty. Examples: ${methodInfo.examples(params)}</div>
+        </div>
+      `;
+    } else if (method === "linear") {
+      html = `
+        <div class="param-row">
+          <label>Threshold
+            <input type="number" step="1" min="1" value="${params.threshold}" 
+                   oninput="state.params.linear.threshold = Number(this.value); recompute(); renderSloChart();" />
+          </label>
+          <div class="muted" style="font-size: 12px;">Score reaches zero at this negative EB%. Examples: ${methodInfo.examples(params)}</div>
+        </div>
+      `;
+    } else if (method === "inverse") {
+      html = `
+        <div class="param-row">
+          <label>k (steepness)
+            <input type="number" step="0.1" min="0.1" value="${params.k}" 
+                   oninput="state.params.inverse.k = Number(this.value); recompute(); renderSloChart();" />
+          </label>
+          <div class="muted" style="font-size: 12px;">Higher = steeper drop. Examples: ${methodInfo.examples(params)}</div>
+        </div>
+      `;
+    } else if (method === "logarithmic") {
+      html = `
+        <div class="param-row">
+          <label>Max expected
+            <input type="number" step="1" min="1" value="${params.maxExpected}" 
+                   oninput="state.params.logarithmic.maxExpected = Number(this.value); recompute(); renderSloChart();" />
+          </label>
+          <div class="muted" style="font-size: 12px;">Score reaches zero at this negative EB%. Examples: ${methodInfo.examples(params)}</div>
+        </div>
+      `;
+    } else if (method === "sigmoid") {
+      html = `
+        <div class="param-row">
+          <label>Midpoint
+            <input type="number" step="1" value="${params.midpoint}" 
+                   oninput="state.params.sigmoid.midpoint = Number(this.value); recompute(); renderSloChart();" />
+          </label>
+          <label>Steepness
+            <input type="number" step="0.1" value="${params.steepness}" 
+                   oninput="state.params.sigmoid.steepness = Number(this.value); recompute(); renderSloChart();" />
+          </label>
+          <div class="muted" style="font-size: 12px;">S-curve: score is 0.5 at midpoint. Examples: ${methodInfo.examples(params)}</div>
+        </div>
+      `;
+    } else if (method === "bucket") {
+      const bucketsJson = JSON.stringify(params.buckets);
+      html = `
+        <div class="param-row">
+          <label>Buckets (JSON: [[threshold, score], ...])
+            <input type="text" value='${bucketsJson}' 
+                   oninput="try { state.params.bucket.buckets = JSON.parse(this.value); recompute(); renderSloChart(); } catch(e) {}" 
+                   style="font-family: monospace; width: 100%;" />
+          </label>
+          <div class="muted" style="font-size: 12px;">Examples: ${methodInfo.examples(params)}</div>
+        </div>
+      `;
+    }
+    
+    el.methodParams.innerHTML = html;
+  }
+
   // ---------- Compute ----------
   function recompute() {
     // Keep tier weights synced
     state.tierWeights.p0 = Number(el.wP0.value);
     state.tierWeights.p1 = Number(el.wP1.value);
     state.tierWeights.p2 = Number(el.wP2.value);
+    state.method = el.method.value || "exponential";
 
-    // Build per-SLO values
+    // Ensure params exist (handle old saved state)
+    if (!state.params) {
+      state.params = {
+        exponential: { decay: 0.85 },
+        linear: { threshold: 10 },
+        inverse: { k: 1.0 },
+        logarithmic: { maxExpected: 20 },
+        sigmoid: { midpoint: 5, steepness: 1.0 },
+        bucket: { buckets: [[0, 1.0], [1, 0.8], [3, 0.5], [6, 0.2], [11, 0.0]] }
+      };
+    }
+
+    const method = state.method;
+    const params = state.params[method];
+    const normMethod = normMethods[method];
+
+    // Build per-SLO values with penalty-based normalization
     const items = state.slos.map(slo => {
       const ebPct = Number(slo.ebPct);
-      const s = clamp(ebPct / 100, 0, 1);
+      // NEW: EB% >= 0 gives full score, negative EB% applies penalty
+      const negativeAmount = Math.max(0, -ebPct);
+      const s = ebPct >= 0 ? 1.0 : normMethod.calc(negativeAmount, params);
       const w = Math.max(0, Number(weightForSlo(slo))); // don't allow negative weight
       const ws = w * s;
-      return { ...slo, ebPct, s, w, ws };
+      return { ...slo, ebPct, negativeAmount, s, w, ws };
     });
 
     // Weighted average
@@ -1902,27 +2549,35 @@
     // Render aggregate visualization
     renderAggregateViz(items, denom, numer, S);
 
+    // Render chart and method params
+    renderSloChart();
+    
     // Formula box
     const modeDesc = `Tier weights (p0=${state.tierWeights.p0}, p1=${state.tierWeights.p1}, p2=${state.tierWeights.p2})`;
+    const methodInfo = normMethods[method];
+    const sloList = items.map(it => 
+      `    ${it.name}: EB%=${it.ebPct}, ${it.ebPct >= 0 ? 'no penalty' : `penalty on ${Math.abs(it.ebPct)}%`} → s = ${fmt(it.s, 4)}`
+    ).join("\n") || "    (no SLOs)";
 
     el.formulaBox.textContent =
 `DEFINITIONS
-  The subscript "i" refers to an individual SLO (e.g., w₁ is the weight for SLO 1).
-
   wᵢ    = weight for an individual SLO (determined by tier: ${modeDesc})
-  sᵢ    = normalized value for an individual SLO (its EB% ÷ 100, clamped to 0–1)
+  sᵢ    = normalized score for an individual SLO
+          - If EB% >= 0: sᵢ = 1.0 (meeting SLO, full points)
+          - If EB% < 0: apply penalty using ${methodInfo.name}
+  Penalty formula: ${methodInfo.formula(params)}
   S     = weighted average of all individual sᵢ values (0–1)
   Score = final scorecard value (budget × S)
 
-CALCULATION
-  For each SLO:  sᵢ = EBᵢ ÷ 100
+CURRENT SLOs (${items.length} total)
+${sloList}
 
+CALCULATION
   Weighted average:
-    S = sum of (wᵢ × sᵢ) ÷ sum of (wᵢ)
-    S = ${fmt(numer,4)} ÷ ${fmt(denom,4)} = ${fmt(S,4)}
+    S = Σ(wᵢ × sᵢ) / Σ(wᵢ)
+    S = ${fmt(numer,4)} / ${fmt(denom,4)} = ${fmt(S,4)}
 
   Final score:
-    score = budget × S
     score = ${pointBudget} × ${fmt(S,4)} = ${fmt2(points)}
 `;
     
@@ -1940,6 +2595,13 @@ CALCULATION
   el.wP0.addEventListener("input", recompute);
   el.wP1.addEventListener("input", recompute);
   el.wP2.addEventListener("input", recompute);
+  el.method.addEventListener("change", () => {
+    renderSloMethodParams();
+    recompute();
+  });
+  el.showAllMethods.addEventListener("change", () => {
+    renderSloChart();
+  });
 
   const sloNameInventory = [
     "API availability",
@@ -1993,10 +2655,12 @@ CALCULATION
     el.wP0.value = state.tierWeights.p0;
     el.wP1.value = state.tierWeights.p1;
     el.wP2.value = state.tierWeights.p2;
+    el.method.value = state.method || "exponential";
   }
 
   // ---------- Init ----------
     syncControlsFromState();
+    renderSloMethodParams();
     renderTable();
     recompute();
 
@@ -2025,6 +2689,7 @@ CALCULATION
   });
 
   let vulnState = savedState?.vuln || defaultVulnState();
+  window.vulnState = vulnState;  // Make accessible to calculateOpportunities
 
   // ---------- Vuln DOM ----------
   const vulnEl = {
@@ -2050,82 +2715,6 @@ CALCULATION
 
   // Chart instance
   let vulnChart = null;
-  
-  // Method colors for chart
-  const methodColors = {
-    exponential: { border: "#6ee7b7", bg: "rgba(110,231,183,0.1)" },
-    linear: { border: "#fb7185", bg: "rgba(251,113,133,0.1)" },
-    inverse: { border: "#93c5fd", bg: "rgba(147,197,253,0.1)" },
-    logarithmic: { border: "#fde68a", bg: "rgba(253,230,138,0.1)" },
-    sigmoid: { border: "#c4b5fd", bg: "rgba(196,181,253,0.1)" },
-    bucket: { border: "#fdba74", bg: "rgba(253,186,116,0.1)" }
-  };
-
-  // ---------- Normalization Methods ----------
-  const normMethods = {
-    exponential: {
-      name: "Exponential decay",
-      calc: (count, params) => Math.pow(params.decay, count),
-      formula: (params) => `sᵢ = ${params.decay}^count`,
-      examples: (params) => {
-        const d = params.decay;
-        return `0 → 1.00, 1 → ${fmt2(Math.pow(d,1))}, 3 → ${fmt2(Math.pow(d,3))}, 5 → ${fmt2(Math.pow(d,5))}, 10 → ${fmt2(Math.pow(d,10))}`;
-      }
-    },
-    linear: {
-      name: "Linear threshold",
-      calc: (count, params) => Math.max(0, 1 - count / params.threshold),
-      formula: (params) => `sᵢ = max(0, 1 - count / ${params.threshold})`,
-      examples: (params) => {
-        const t = params.threshold;
-        return `0 → 1.00, ${Math.floor(t/2)} → ${fmt2(0.5)}, ${t} → 0.00, ${t+5} → 0.00`;
-      }
-    },
-    inverse: {
-      name: "Inverse (hyperbolic)",
-      calc: (count, params) => 1 / (1 + params.k * count),
-      formula: (params) => `sᵢ = 1 / (1 + ${params.k} × count)`,
-      examples: (params) => {
-        const k = params.k;
-        const f = c => 1 / (1 + k * c);
-        return `0 → 1.00, 1 → ${fmt2(f(1))}, 3 → ${fmt2(f(3))}, 5 → ${fmt2(f(5))}, 10 → ${fmt2(f(10))}`;
-      }
-    },
-    logarithmic: {
-      name: "Logarithmic",
-      calc: (count, params) => Math.max(0, 1 - Math.log(1 + count) / Math.log(1 + params.maxExpected)),
-      formula: (params) => `sᵢ = max(0, 1 - log(1+count) / log(1+${params.maxExpected}))`,
-      examples: (params) => {
-        const m = params.maxExpected;
-        const f = c => Math.max(0, 1 - Math.log(1+c) / Math.log(1+m));
-        return `0 → 1.00, 1 → ${fmt2(f(1))}, 5 → ${fmt2(f(5))}, ${m} → 0.00`;
-      }
-    },
-    sigmoid: {
-      name: "Sigmoid (S-curve)",
-      calc: (count, params) => 1 / (1 + Math.exp(params.steepness * (count - params.midpoint))),
-      formula: (params) => `sᵢ = 1 / (1 + e^(${params.steepness} × (count - ${params.midpoint})))`,
-      examples: (params) => {
-        const f = c => 1 / (1 + Math.exp(params.steepness * (c - params.midpoint)));
-        return `0 → ${fmt2(f(0))}, ${params.midpoint} → 0.50, ${params.midpoint * 2} → ${fmt2(f(params.midpoint * 2))}`;
-      }
-    },
-    bucket: {
-      name: "Bucket / Step function",
-      calc: (count, params) => {
-        const buckets = params.buckets; // [[threshold, score], ...]
-        let score = 1.0;
-        for (const [thresh, s] of buckets) {
-          if (count >= thresh) score = s;
-        }
-        return score;
-      },
-      formula: (params) => `Step function with ${params.buckets.length} buckets`,
-      examples: (params) => {
-        return params.buckets.map(([t, s]) => `${t}+ → ${fmt2(s)}`).join(", ");
-      }
-    }
-  };
 
   // ---------- Render Chart ----------
   function renderVulnChart() {
@@ -2396,6 +2985,7 @@ CALCULATION
     
     vulnState.images.forEach((img, idx) => {
       const tr = document.createElement("tr");
+      tr.id = `vuln-row-${idx}`;  // Add unique ID for direct linking
       
       tr.innerHTML = `
         <td><input type="text" value="${escapeHtml(img.name)}" style="width: 120px;" data-idx="${idx}" data-field="name" /></td>
@@ -2459,6 +3049,7 @@ CALCULATION
     
     return { items, denom, numer, S, severityTotals };
   }
+  window.computeVulnScore = computeVulnScore;  // Make accessible to calculateOpportunities
 
   function recomputeVuln() {
     // Sync weights
@@ -2675,6 +3266,7 @@ CALCULATION
   });
 
   let bugState = savedState?.bug || defaultBugState();
+  window.bugState = bugState;  // Make accessible to calculateOpportunities
   
   // Migration: convert old counts format to tickets format
   if (bugState.counts && !bugState.tickets) {
@@ -2750,6 +3342,7 @@ CALCULATION
     
     return { items, denom, numer, S, counts };
   }
+  window.computeBugScore = computeBugScore;  // Make accessible to calculateOpportunities
 
   function recomputeBug() {
     // Sync config state from inputs
@@ -3111,6 +3704,7 @@ ${items.map(it => `    ${it.name}: count=${it.count} → s = ${fmt(it.s, 4)}`).j
     
     bugState.tickets.forEach((ticket, idx) => {
       const tr = document.createElement("tr");
+      tr.id = `bug-row-${idx}`;  // Add unique ID for direct linking
       
       tr.innerHTML = `
         <td><input type="text" value="${escapeHtml(ticket.name)}" style="width: 140px;" data-idx="${idx}" data-field="name" /></td>
@@ -3240,6 +3834,7 @@ ${items.map(it => `    ${it.name}: count=${it.count} → s = ${fmt(it.s, 4)}`).j
   });
 
   let pmState = savedState?.pm || defaultPmState();
+  window.pmState = pmState;  // Make accessible to calculateOpportunities
   
   // Migration: convert old incidents format to problems format
   if (pmState.incidents && !pmState.problems) {
@@ -3354,6 +3949,7 @@ ${items.map(it => `    ${it.name}: count=${it.count} → s = ${fmt(it.s, 4)}`).j
     
     return { items, denom, numer, S, weightedTotals, rawCounts };
   }
+  window.computePmScore = computePmScore;  // Make accessible to calculateOpportunities
 
   function recomputePm() {
     // Sync state from inputs
@@ -3732,6 +4328,7 @@ ${items.map(it => `     ${it.name}: weighted=${fmt(it.weightedCount, 2)} → s =
     
     pmState.problems.forEach((problem, idx) => {
       const tr = document.createElement("tr");
+      tr.id = `pm-row-${idx}`;  // Add unique ID for direct linking
       
       tr.innerHTML = `
         <td><input type="text" value="${escapeHtml(problem.incident)}" style="width: 170px;" data-idx="${idx}" data-field="incident" /></td>
