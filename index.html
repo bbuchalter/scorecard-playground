@@ -939,26 +939,18 @@
     }
 
     .team-selector-wrapper {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .team-selector-wrapper label {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--muted);
+      margin-bottom: 20px;
     }
 
     .team-selector-wrapper select {
-      font-size: 14px;
-      padding: 8px 12px;
+      font-size: 13px;
+      padding: 10px 12px;
       background: rgba(255,255,255,.08);
       border: 1px solid var(--border);
       border-radius: 8px;
       color: var(--text);
       cursor: pointer;
-      min-width: 200px;
+      width: 100%;
     }
 
     .team-selector-wrapper select:hover {
@@ -1005,7 +997,14 @@
   <div class="page-layout">
     <!-- Sidebar -->
     <aside class="sidebar">
-      <h1 class="sidebar-main-title">Company Scorecard</h1>
+      <h1 class="sidebar-main-title">Team Scorecard</h1>
+
+      <!-- Team Selector -->
+      <div class="team-selector-wrapper">
+        <select id="teamSelector">
+          <option value="">Loading teams...</option>
+        </select>
+      </div>
 
       <!-- Overall Score Summary -->
       <div class="score-summary">
@@ -1068,17 +1067,9 @@
 
     <!-- Main content -->
     <div class="wrap">
-      <!-- Top Header with Team Selector and Nav -->
+      <!-- Top Header with Nav -->
       <header class="top-header">
-        <div class="top-header-left">
-          <h1 class="top-header-title">Scorecard Config</h1>
-          <div class="team-selector-wrapper">
-            <label>Team:</label>
-            <select id="teamSelector">
-              <option value="">Loading teams...</option>
-            </select>
-          </div>
-        </div>
+        <h1 class="top-header-title">Scorecard Config</h1>
         <nav class="nav-links">
           <a href="dashboard.html" class="nav-btn">📊 Dashboard</a>
           <a href="data-editor.html" class="nav-btn">✏️ Data Editor</a>
@@ -1091,7 +1082,7 @@
           <h1 class="welcome-title">Design your company's health scorecard</h1>
           <p class="welcome-desc">
             This configuration playground lets you design a single scoring model that applies to all teams across your organization. 
-            Select any team from the dropdown above to simulate how your configuration affects their scores in real-time.
+            Select any team from the sidebar to simulate how your configuration affects their scores in real-time.
             All changes to weights, thresholds, and normalization methods apply globally to every team.
           </p>
           
