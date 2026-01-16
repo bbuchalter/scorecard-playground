@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Company Scorecards</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="scorecard-config.js"></script>
+  <script src="scorecard-compute.js"></script>
+  <script src="mock-data.js"></script>
   <style>
     :root {
       --bg: #0b1020;
@@ -79,6 +82,27 @@
     .breadcrumb-current {
       color: var(--text);
       font-weight: 600;
+    }
+
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 18px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255,255,255,.14);
+      border-color: rgba(255,255,255,.20);
+      transform: translateY(-1px);
     }
 
     .view-selector {
@@ -521,8 +545,16 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1 class="title">Company Scorecards</h1>
-      <div class="breadcrumb" id="breadcrumb"></div>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <h1 class="title">Company Scorecards</h1>
+          <div class="breadcrumb" id="breadcrumb"></div>
+        </div>
+        <nav style="display: flex; gap: 12px;">
+          <a href="index.html" class="nav-btn">⚙️ Config</a>
+          <a href="data-editor.html" class="nav-btn">✏️ Data Editor</a>
+        </nav>
+      </div>
     </div>
 
     <div id="heroGradeContainer"></div>
@@ -530,7 +562,124 @@
   </div>
 
 <script>
-  // ========== DATA STRUCTURE ==========
+  // ========== BUILD ORGANIZATION DATA FROM MOCK DATA ==========
+  
+  // Load configuration and mock data
+  const config = window.ScorecardConfig.loadConfig();
+  const mockData = window.MockData.loadMockData();
+  const normMethods = window.ScorecardConfig.normMethods;
+  const compute = window.ScorecardCompute;
+
+  // Helper function to compute metrics for a team
+  function computeTeamMetrics(teamData) {
+    const sloResult = compute.computeSloScore(teamData.slos || [], config.slo, normMethods);
+    const vulnResult = compute.computeVulnScore(teamData.images || [], config.vuln, normMethods);
+    const bugResult = compute.computeBugScore(teamData.tickets || [], config.bug, normMethods);
+    const pmResult = compute.computePmScore(teamData.problems || [], config.pm, normMethods);
+
+    // Convert scores (0-100) to match dashboard format
+    return {
+      slos: { score: Math.round(sloResult.S * 100), trend: [85, 86, 87, Math.round(sloResult.S * 100)] },
+      vulns: { score: Math.round(vulnResult.S * 100), trend: [72, 74, 75, Math.round(vulnResult.S * 100)] },
+      bugs: { score: Math.round(bugResult.S * 100), trend: [78, 79, 80, Math.round(bugResult.S * 100)] },
+      postmortems: { score: Math.round(pmResult.S * 100), trend: [58, 55, 53, Math.round(pmResult.S * 100)] }
+    };
+  }
+
+  // Build organization data structure from mock data
+  function buildOrganizationData() {
+    const orgData = {};
+
+    Object.keys(mockData).forEach(groupKey => {
+      const groupMockData = mockData[groupKey];
+      const hierarchy = window.MockData.organizationHierarchy[groupKey];
+      
+      orgData[groupKey] = {
+        name: hierarchy.name,
+        subTeams: Object.keys(hierarchy.teams),
+        teams: {}
+      };
+
+      // Aggregate metrics for the group (average of all leaf teams)
+      let groupMetricsSum = { slos: 0, vulns: 0, bugs: 0, postmortems: 0 };
+      let leafTeamCount = 0;
+
+      Object.keys(groupMockData.teams).forEach(teamKey => {
+        const teamMockData = groupMockData.teams[teamKey];
+        const teamHierarchy = hierarchy.teams[teamKey];
+
+        if (teamMockData.subTeams) {
+          // Team with sub-teams
+          orgData[groupKey].teams[teamKey] = {
+            subTeams: {}
+          };
+
+          let teamMetricsSum = { slos: 0, vulns: 0, bugs: 0, postmortems: 0 };
+          let subTeamCount = 0;
+
+          Object.keys(teamMockData.subTeams).forEach(subTeamKey => {
+            const subTeamData = teamMockData.subTeams[subTeamKey];
+            const metrics = computeTeamMetrics(subTeamData);
+            
+            orgData[groupKey].teams[teamKey].subTeams[subTeamKey] = {
+              metrics: metrics
+            };
+
+            // Aggregate for team
+            teamMetricsSum.slos += metrics.slos.score;
+            teamMetricsSum.vulns += metrics.vulns.score;
+            teamMetricsSum.bugs += metrics.bugs.score;
+            teamMetricsSum.postmortems += metrics.postmortems.score;
+            subTeamCount++;
+            
+            // Aggregate for group
+            groupMetricsSum.slos += metrics.slos.score;
+            groupMetricsSum.vulns += metrics.vulns.score;
+            groupMetricsSum.bugs += metrics.bugs.score;
+            groupMetricsSum.postmortems += metrics.postmortems.score;
+            leafTeamCount++;
+          });
+
+          // Set team metrics as average of sub-teams
+          orgData[groupKey].teams[teamKey].metrics = {
+            slos: { score: Math.round(teamMetricsSum.slos / subTeamCount), trend: [85, 86, 87, Math.round(teamMetricsSum.slos / subTeamCount)] },
+            vulns: { score: Math.round(teamMetricsSum.vulns / subTeamCount), trend: [72, 74, 75, Math.round(teamMetricsSum.vulns / subTeamCount)] },
+            bugs: { score: Math.round(teamMetricsSum.bugs / subTeamCount), trend: [78, 79, 80, Math.round(teamMetricsSum.bugs / subTeamCount)] },
+            postmortems: { score: Math.round(teamMetricsSum.postmortems / subTeamCount), trend: [58, 55, 53, Math.round(teamMetricsSum.postmortems / subTeamCount)] }
+          };
+        } else {
+          // Leaf team
+          const metrics = computeTeamMetrics(teamMockData);
+          orgData[groupKey].teams[teamKey] = {
+            metrics: metrics
+          };
+
+          // Aggregate for group
+          groupMetricsSum.slos += metrics.slos.score;
+          groupMetricsSum.vulns += metrics.vulns.score;
+          groupMetricsSum.bugs += metrics.bugs.score;
+          groupMetricsSum.postmortems += metrics.postmortems.score;
+          leafTeamCount++;
+        }
+      });
+
+      // Set group metrics as average of all leaf teams
+      orgData[groupKey].metrics = {
+        slos: { score: Math.round(groupMetricsSum.slos / leafTeamCount), trend: [85, 86, 87, Math.round(groupMetricsSum.slos / leafTeamCount)] },
+        vulns: { score: Math.round(groupMetricsSum.vulns / leafTeamCount), trend: [72, 74, 75, Math.round(groupMetricsSum.vulns / leafTeamCount)] },
+        bugs: { score: Math.round(groupMetricsSum.bugs / leafTeamCount), trend: [78, 79, 80, Math.round(groupMetricsSum.bugs / leafTeamCount)] },
+        postmortems: { score: Math.round(groupMetricsSum.postmortems / leafTeamCount), trend: [58, 55, 53, Math.round(groupMetricsSum.postmortems / leafTeamCount)] }
+      };
+    });
+
+    return orgData;
+  }
+
+  // Build organization data dynamically
+  const organizationData = buildOrganizationData();
+
+  // Original hardcoded data structure preserved for reference:
+  /*
   const organizationData = {
     'Applications': {
       name: 'Applications',
@@ -857,6 +1006,7 @@
       }
     }
   };
+  */
 
   // ========== STATE MANAGEMENT ==========
   let navigationPath = []; // Array to track path: [] = top-level, ['Applications'] = group, ['Applications', 'Backend API'] = team, ['Applications', 'Backend API', 'API Gateway'] = sub-team
@@ -975,160 +1125,112 @@
   }
 
   function calculatePriorityWork() {
-    const opportunities = [];
     const current = getCurrentData();
     
-    // Helper to calculate realistic improvement opportunity
-    // Assumes each metric is weighted equally (25% of total score)
-    // and that fixing one major issue improves that metric by 10-20 points
-    function calculateRealisticOpportunity(currentScore) {
-      // Lower scores have more potential for improvement per work item
-      if (currentScore < 60) {
-        // Critical items: fixing one major issue = 15 point metric improvement
-        return (15 * 0.25); // ~3.75 points
-      } else if (currentScore < 70) {
-        // At-risk items: fixing one issue = 12 point metric improvement
-        return (12 * 0.25); // ~3 points
-      } else if (currentScore < 80) {
-        // Fair items: fixing one issue = 10 point metric improvement
-        return (10 * 0.25); // ~2.5 points
-      } else {
-        // Good items: fixing one issue = 8 point metric improvement
-        return (8 * 0.25); // ~2 points
-      }
-    }
-    
-    if (current.type === 'top-level') {
-      // Top-level: show specific work items from all groups
-      const topLevelGroups = Object.keys(organizationData);
+    // Get teams to process based on current navigation level
+    function getTeamsToProcess() {
+      const teams = [];
       
-      topLevelGroups.forEach(groupKey => {
-        const group = organizationData[groupKey];
-        const teamKeys = Object.keys(group.teams);
-        
-        // Get specific work items from each team
-        teamKeys.forEach(teamKey => {
-          const team = group.teams[teamKey];
+      if (current.type === 'top-level') {
+        // Top-level: get all leaf teams
+        Object.keys(mockData).forEach(groupKey => {
+          const groupMockData = mockData[groupKey];
+          const hierarchy = window.MockData.organizationHierarchy[groupKey];
           
-          // SLOs - find lowest scoring ones
-          if (team.metrics.slos.score < 90) {
-            const opportunity = calculateRealisticOpportunity(team.metrics.slos.score);
-            opportunities.push({
-              category: 'SLOs',
-              categoryColor: '#93c5fd',
-              name: `Improve ${teamKey} SLO compliance`,
-              team: `${group.name} › ${teamKey}`,
-              opportunity: opportunity,
-              score: team.metrics.slos.score
-            });
-          }
-          
-          // Vulns - if score is low, there are vulnerabilities
-          if (team.metrics.vulns.score < 90) {
-            const opportunity = calculateRealisticOpportunity(team.metrics.vulns.score);
-            opportunities.push({
-              category: 'Vulns',
-              categoryColor: '#fb7185',
-              name: `Remediate ${teamKey} vulnerabilities`,
-              team: `${group.name} › ${teamKey}`,
-              opportunity: opportunity,
-              score: team.metrics.vulns.score
-            });
-          }
-          
-          // Bugs
-          if (team.metrics.bugs.score < 90) {
-            const opportunity = calculateRealisticOpportunity(team.metrics.bugs.score);
-            opportunities.push({
-              category: 'Bugs',
-              categoryColor: '#fde68a',
-              name: `Fix ${teamKey} bug backlog`,
-              team: `${group.name} › ${teamKey}`,
-              opportunity: opportunity,
-              score: team.metrics.bugs.score
-            });
-          }
-          
-          // Postmortems
-          if (team.metrics.postmortems.score < 90) {
-            const opportunity = calculateRealisticOpportunity(team.metrics.postmortems.score);
-            opportunities.push({
-              category: 'Postmortems',
-              categoryColor: '#c4b5fd',
-              name: `Complete ${teamKey} postmortem actions`,
-              team: `${group.name} › ${teamKey}`,
-              opportunity: opportunity,
-              score: team.metrics.postmortems.score
-            });
-          }
+          Object.keys(groupMockData.teams).forEach(teamKey => {
+            const teamMockData = groupMockData.teams[teamKey];
+            
+            if (teamMockData.subTeams) {
+              Object.keys(teamMockData.subTeams).forEach(subTeamKey => {
+                teams.push({
+                  data: teamMockData.subTeams[subTeamKey],
+                  label: `${hierarchy.name} › ${teamKey} › ${subTeamKey}`,
+                  path: [groupKey, teamKey, subTeamKey]
+                });
+              });
+            } else {
+              teams.push({
+                data: teamMockData,
+                label: `${hierarchy.name} › ${teamKey}`,
+                path: [groupKey, teamKey]
+              });
+            }
+          });
         });
-      });
-    } else if (current.type === 'group') {
-      // Group detail: show specific work items from teams in this group
-      const group = current.data;
-      const teamKeys = Object.keys(group.teams);
+      } else if (current.type === 'group') {
+        // Group level: get all teams in this group
+        const groupKey = navigationPath[0];
+        const groupMockData = mockData[groupKey];
+        
+        if (groupMockData && groupMockData.teams) {
+          Object.keys(groupMockData.teams).forEach(teamKey => {
+            const teamMockData = groupMockData.teams[teamKey];
+            
+            if (teamMockData.subTeams) {
+              Object.keys(teamMockData.subTeams).forEach(subTeamKey => {
+                teams.push({
+                  data: teamMockData.subTeams[subTeamKey],
+                  label: `${teamKey} › ${subTeamKey}`,
+                  path: [groupKey, teamKey, subTeamKey]
+                });
+              });
+            } else {
+              teams.push({
+                data: teamMockData,
+                label: teamKey,
+                path: [groupKey, teamKey]
+              });
+            }
+          });
+        }
+      } else if (current.type === 'team') {
+        // Team level: get this team or its sub-teams
+        const groupKey = navigationPath[0];
+        const teamKey = navigationPath[1];
+        const groupMockData = mockData[groupKey];
+        
+        if (groupMockData && groupMockData.teams && groupMockData.teams[teamKey]) {
+          const teamMockData = groupMockData.teams[teamKey];
+          
+          if (teamMockData.subTeams) {
+            Object.keys(teamMockData.subTeams).forEach(subTeamKey => {
+              teams.push({
+                data: teamMockData.subTeams[subTeamKey],
+                label: subTeamKey,
+                path: [groupKey, teamKey, subTeamKey]
+              });
+            });
+          } else {
+            teams.push({
+              data: teamMockData,
+              label: teamKey,
+              path: [groupKey, teamKey]
+            });
+          }
+        }
+      } else if (current.type === 'sub-team') {
+        // Sub-team level: just this sub-team
+        const groupKey = navigationPath[0];
+        const teamKey = navigationPath[1];
+        const subTeamKey = navigationPath[2];
+        const groupMockData = mockData[groupKey];
+        
+        if (groupMockData && groupMockData.teams && groupMockData.teams[teamKey] && 
+            groupMockData.teams[teamKey].subTeams && groupMockData.teams[teamKey].subTeams[subTeamKey]) {
+          teams.push({
+            data: groupMockData.teams[teamKey].subTeams[subTeamKey],
+            label: subTeamKey,
+            path: [groupKey, teamKey, subTeamKey]
+          });
+        }
+      }
       
-      teamKeys.forEach(teamKey => {
-        const team = group.teams[teamKey];
-        
-        // SLOs
-        if (team.metrics.slos.score < 90) {
-          const opportunity = calculateRealisticOpportunity(team.metrics.slos.score);
-          opportunities.push({
-            category: 'SLOs',
-            categoryColor: '#93c5fd',
-            name: `Improve SLO compliance`,
-            team: teamKey,
-            opportunity: opportunity,
-            score: team.metrics.slos.score
-          });
-        }
-        
-        // Vulns
-        if (team.metrics.vulns.score < 90) {
-          const opportunity = calculateRealisticOpportunity(team.metrics.vulns.score);
-          opportunities.push({
-            category: 'Vulns',
-            categoryColor: '#fb7185',
-            name: `Remediate container vulnerabilities`,
-            team: teamKey,
-            opportunity: opportunity,
-            score: team.metrics.vulns.score
-          });
-        }
-        
-        // Bugs
-        if (team.metrics.bugs.score < 90) {
-          const opportunity = calculateRealisticOpportunity(team.metrics.bugs.score);
-          opportunities.push({
-            category: 'Bugs',
-            categoryColor: '#fde68a',
-            name: `Fix bug backlog`,
-            team: teamKey,
-            opportunity: opportunity,
-            score: team.metrics.bugs.score
-          });
-        }
-        
-        // Postmortems
-        if (team.metrics.postmortems.score < 90) {
-          const opportunity = calculateRealisticOpportunity(team.metrics.postmortems.score);
-          opportunities.push({
-            category: 'Postmortems',
-            categoryColor: '#c4b5fd',
-            name: `Complete postmortem actions`,
-            team: teamKey,
-            opportunity: opportunity,
-            score: team.metrics.postmortems.score
-          });
-        }
-      });
+      return teams;
     }
     
-    // Sort by opportunity descending
-    opportunities.sort((a, b) => b.opportunity - a.opportunity);
-    
-    return opportunities.slice(0, 10); // Top 10
+    // Use the shared function from scorecard-compute.js
+    const teamsToProcess = getTeamsToProcess();
+    return compute.calculateOpportunitiesForTeams(teamsToProcess, config, normMethods, 10);
   }
 
   function renderPriorityWork() {
@@ -1138,17 +1240,24 @@
       return '<div class="priority-empty">✓ All items at max score!</div>';
     }
     
-    return opportunities.map(opp => `
-      <a href="#" class="priority-item">
-        <div class="priority-item-header">
-          <span class="priority-item-dot" style="background: ${opp.categoryColor};"></span>
-          <span class="priority-item-category">${opp.category}</span>
-          <span class="priority-item-opportunity">+${opp.opportunity.toFixed(2)} pts</span>
-        </div>
-        <div class="priority-item-name">${escapeHtml(opp.name)}</div>
-        <div class="priority-item-team">${escapeHtml(opp.team)}</div>
-      </a>
-    `).join('');
+    return opportunities.map(opp => {
+      // Build URL with team path and item ID
+      const teamPathParam = opp.teamPath ? encodeURIComponent(JSON.stringify(opp.teamPath)) : '';
+      const itemParam = encodeURIComponent(opp.itemId);
+      const href = `index.html?team=${teamPathParam}&item=${itemParam}`;
+      
+      return `
+        <a href="${href}" class="priority-item">
+          <div class="priority-item-header">
+            <span class="priority-item-dot" style="background: ${opp.categoryColor};"></span>
+            <span class="priority-item-category">${opp.category}</span>
+            <span class="priority-item-opportunity">+${opp.opportunity.toFixed(2)} pts</span>
+          </div>
+          <div class="priority-item-name">${escapeHtml(opp.name)}</div>
+          <div class="priority-item-team">${escapeHtml(opp.team)}</div>
+        </a>
+      `;
+    }).join('');
   }
 
   // ========== RENDER FUNCTIONS ==========
@@ -1605,6 +1714,100 @@
     }, 0);
   }
 
+  function renderSingleTeamTable(teamName, metrics) {
+    const scores = [
+      metrics.slos.score,
+      metrics.vulns.score,
+      metrics.bugs.score,
+      metrics.postmortems.score
+    ];
+    const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    const avgClass = getScoreClass(avg);
+    const letterGrade = getLetterGrade(avg);
+    const avgTrend = [];
+    for (let i = 0; i < 4; i++) {
+      avgTrend.push(Math.round(
+        (metrics.slos.trend[i] + metrics.vulns.trend[i] + 
+         metrics.bugs.trend[i] + metrics.postmortems.trend[i]) / 4
+      ));
+    }
+
+    // Sanitize teamName for use in canvas IDs (replace spaces and special chars)
+    const safeId = teamName.replace(/[^a-zA-Z0-9]/g, '-');
+
+    const html = `
+      <div class="scorecard-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Sub-Team</th>
+              <th>SLOs</th>
+              <th>Vulns</th>
+              <th>Bugs</th>
+              <th>Postmortems</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="metric-cell">
+                <div class="metric-content">
+                  <div class="group-name" style="text-align: center; margin-bottom: 8px;">${teamName}</div>
+                  <div class="grade-badge ${avgClass}">${letterGrade}</div>
+                  <div class="sparkline-container">
+                    <canvas id="chart-single-${safeId}-grade"></canvas>
+                  </div>
+                </div>
+              </td>
+              <td class="metric-cell">
+                <div class="metric-content">
+                  <div class="score-badge ${getScoreClass(metrics.slos.score)}">${metrics.slos.score}</div>
+                  <div class="sparkline-container">
+                    <canvas id="chart-single-${safeId}-slos"></canvas>
+                  </div>
+                </div>
+              </td>
+              <td class="metric-cell">
+                <div class="metric-content">
+                  <div class="score-badge ${getScoreClass(metrics.vulns.score)}">${metrics.vulns.score}</div>
+                  <div class="sparkline-container">
+                    <canvas id="chart-single-${safeId}-vulns"></canvas>
+                  </div>
+                </div>
+              </td>
+              <td class="metric-cell">
+                <div class="metric-content">
+                  <div class="score-badge ${getScoreClass(metrics.bugs.score)}">${metrics.bugs.score}</div>
+                  <div class="sparkline-container">
+                    <canvas id="chart-single-${safeId}-bugs"></canvas>
+                  </div>
+                </div>
+              </td>
+              <td class="metric-cell">
+                <div class="metric-content">
+                  <div class="score-badge ${getScoreClass(metrics.postmortems.score)}">${metrics.postmortems.score}</div>
+                  <div class="sparkline-container">
+                    <canvas id="chart-single-${safeId}-postmortems"></canvas>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    document.getElementById('tableContainer').innerHTML = html;
+
+    // Create sparklines
+    setTimeout(() => {
+      createSparkline(`chart-single-${safeId}-grade`, avgTrend, avg);
+      createSparkline(`chart-single-${safeId}-slos`, metrics.slos.trend, metrics.slos.score);
+      createSparkline(`chart-single-${safeId}-vulns`, metrics.vulns.trend, metrics.vulns.score);
+      createSparkline(`chart-single-${safeId}-bugs`, metrics.bugs.trend, metrics.bugs.score);
+      createSparkline(`chart-single-${safeId}-postmortems`, metrics.postmortems.trend, metrics.postmortems.score);
+    }, 0);
+  }
+
   function render() {
     renderBreadcrumb();
     renderHeroGrade();
@@ -1620,12 +1823,15 @@
       if (team.subTeams && Object.keys(team.subTeams).length > 0) {
         renderTeamDetail(navigationPath[0], navigationPath[1]);
       } else {
-        // Leaf node at team level - show only hero
-        document.getElementById('tableContainer').innerHTML = '';
+        // Leaf node at team level - show single team table
+        renderSingleTeamTable(navigationPath[1], team.metrics);
       }
     } else if (navigationPath.length === 3) {
-      // Leaf node at sub-team level - show only hero
-      document.getElementById('tableContainer').innerHTML = '';
+      // Leaf node at sub-team level - show single team table
+      const group = organizationData[navigationPath[0]];
+      const team = group.teams[navigationPath[1]];
+      const subTeam = team.subTeams[navigationPath[2]];
+      renderSingleTeamTable(navigationPath[2], subTeam.metrics);
     }
   }
 

@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Scorecard Playground</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="scorecard-config.js"></script>
+  <script src="scorecard-compute.js"></script>
+  <script src="mock-data.js"></script>
   <style>
     :root {
       --bg: #0b1020;
@@ -904,13 +907,100 @@
         grid-template-columns: 1fr;
       }
     }
+
+    .top-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 20px 40px;
+      background: rgba(255,255,255,.03);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .top-header-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .top-header-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.3px;
+    }
+
+    .team-selector-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .team-selector-wrapper label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .team-selector-wrapper select {
+      font-size: 14px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      cursor: pointer;
+      min-width: 200px;
+    }
+
+    .team-selector-wrapper select:hover {
+      background: rgba(255,255,255,.12);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 12px;
+    }
+
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 18px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255,255,255,.14);
+      border-color: rgba(255,255,255,.20);
+      transform: translateY(-1px);
+    }
+
+    @media (max-width: 900px) {
+      .top-header {
+        padding: 16px 20px;
+      }
+      .top-header-left {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="page-layout">
     <!-- Sidebar -->
     <aside class="sidebar">
-      <h1 class="sidebar-main-title">Team Scorecard</h1>
+      <h1 class="sidebar-main-title">Company Scorecard</h1>
 
       <!-- Overall Score Summary -->
       <div class="score-summary">
@@ -973,13 +1063,31 @@
 
     <!-- Main content -->
     <div class="wrap">
+      <!-- Top Header with Team Selector and Nav -->
+      <header class="top-header">
+        <div class="top-header-left">
+          <h1 class="top-header-title">Scorecard Config</h1>
+          <div class="team-selector-wrapper">
+            <label>Team:</label>
+            <select id="teamSelector">
+              <option value="">Loading teams...</option>
+            </select>
+          </div>
+        </div>
+        <nav class="nav-links">
+          <a href="dashboard.html" class="nav-btn">📊 Dashboard</a>
+          <a href="data-editor.html" class="nav-btn">✏️ Data Editor</a>
+        </nav>
+      </header>
+
       <!-- Welcome Introduction -->
       <div class="welcome-hero">
         <div class="welcome-hero-left">
-          <h1 class="welcome-title">Design your team's health scorecard</h1>
+          <h1 class="welcome-title">Design your company's health scorecard</h1>
           <p class="welcome-desc">
-            This playground lets you experiment with different scoring models for measuring team and service health. 
-            Adjust weights, thresholds, and normalization methods to see how they affect final scores in real-time.
+            This configuration playground lets you design a single scoring model that applies to all teams across your organization. 
+            Select any team from the dropdown above to simulate how your configuration affects their scores in real-time.
+            All changes to weights, thresholds, and normalization methods apply globally to every team.
           </p>
           
           <div class="welcome-features">
@@ -993,27 +1101,27 @@
             <div class="welcome-feature">
               <span class="feature-icon">🎛️</span>
               <div class="feature-text">
-                <strong>Configurable weights</strong>
-                <span>Prioritize what matters most to your team</span>
+                <strong>Global configuration</strong>
+                <span>One scoring model applied across all teams</span>
               </div>
             </div>
             <div class="welcome-feature">
               <span class="feature-icon">📊</span>
               <div class="feature-text">
-                <strong>Multiple categories</strong>
-                <span>SLOs, vulnerabilities, bugs, and postmortems</span>
+                <strong>Team simulation</strong>
+                <span>Test your config against real team data</span>
               </div>
             </div>
             <div class="welcome-feature">
               <span class="feature-icon">💾</span>
               <div class="feature-text">
-                <strong>Auto-saved state</strong>
-                <span>Your experiments persist across sessions</span>
+                <strong>Persistent configuration</strong>
+                <span>Changes saved automatically for all teams</span>
               </div>
             </div>
           </div>
 
-          <p class="welcome-hint">
+          <p class="welcome-hint" style="margin-top: 20px;">
             <span class="hint-arrow">↓</span> Scroll down to explore each scoring category, or use the sidebar to jump to a specific section.
           </p>
         </div>
@@ -1690,12 +1798,15 @@
   </div><!-- /page-layout -->
 
 <script>
-  // ---------- Helpers ----------
-  const clamp = (x, a=0, b=1) => Math.min(b, Math.max(a, x));
-  const fmt = (x, d=4) => Number.isFinite(x) ? x.toFixed(d) : "NaN";
-  const fmt2 = (x) => Number.isFinite(x) ? x.toFixed(2) : "NaN";
+  // ---------- Helpers (from shared compute module) ----------
+  const clamp = window.ScorecardCompute.clamp;
+  const fmt = window.ScorecardCompute.fmt;
+  const fmt2 = window.ScorecardCompute.fmt2;
 
-  // ---------- Normalization Methods (Shared across all categories) ----------
+  // ---------- Normalization Methods (from shared config module) ----------
+  const normMethods = window.ScorecardConfig.normMethods;
+  
+  /* Original inline definition (now in scorecard-config.js):
   const normMethods = {
     exponential: {
       name: "Exponential decay",
@@ -1760,6 +1871,7 @@
       }
     }
   };
+  */
 
   // Method colors for charts
   const methodColors = {
@@ -1773,231 +1885,154 @@
 
   // ---------- Opportunity Calculation ----------
   // Calculate opportunities for each item across all categories
-  // Returns array of {category, name, opportunity, categoryColor, itemId} sorted by opportunity descending
+  // Uses the shared function from scorecard-compute.js
   function calculateOpportunities() {
-    const opportunities = [];
-    
-    // Helper to compute SLO score with modified data
-    function computeSloScoreWithData(slos, method, params, tierWeights) {
-      const normMethod = normMethods[method];
-      const items = slos.map(slo => {
-        const ebPct = Number(slo.ebPct);
-        const negativeAmount = Math.max(0, -ebPct);
-        const s = ebPct >= 0 ? 1.0 : normMethod.calc(negativeAmount, params);
-        const w = Math.max(0, tierWeights[slo.tier] ?? 1.0);
-        const ws = w * s;
-        return { s, w, ws };
-      });
-      const denom = items.reduce((acc, it) => acc + it.w, 0);
-      const numer = items.reduce((acc, it) => acc + it.ws, 0);
-      const S = (denom > 0 && items.length > 0) ? (numer / denom) : 1.0;
-      return S;
-    }
-
-    // SLOs: Fix = set EB% to 0
     try {
-      if (typeof state !== 'undefined' && state.slos) {
-        const currentS = computeSloScoreWithData(state.slos, state.method, state.params[state.method], state.tierWeights);
-        const currentScore = state.pointBudget * clamp(currentS, 0, 1);
-        
-        state.slos.forEach((slo, idx) => {
-          if (slo.ebPct < 0) {  // Only consider SLOs with negative EB%
-            const fixedSlos = state.slos.map((s, i) => 
-              i === idx ? { ...s, ebPct: 0 } : s
-            );
-            const fixedS = computeSloScoreWithData(fixedSlos, state.method, state.params[state.method], state.tierWeights);
-            const fixedScore = state.pointBudget * clamp(fixedS, 0, 1);
-            const opportunity = fixedScore - currentScore;
-            
-            if (opportunity > 0.01) {  // Only include if meaningful opportunity
-              opportunities.push({
-                category: 'SLOs',
-                categoryColor: '#93c5fd',
-                name: slo.name,
-                opportunity: opportunity,
-                itemId: `slo-${idx}`,
-                link: `#slo-row-${idx}`
-              });
-            }
-          }
-        });
-      }
-    } catch (e) {
-      // SLO state not yet initialized, skip
-    }
-    
-    // Vulns: Fix = set all counts to 0 for that image
-    try {
-      if (typeof window.vulnState !== 'undefined' && window.vulnState && window.vulnState.images && typeof window.computeVulnScore === 'function') {
-        const vulnState = window.vulnState;
-        const computeVulnScore = window.computeVulnScore;
-      const currentResult = computeVulnScore(vulnState.method, vulnState.params[vulnState.method]);
-      const currentScore = vulnState.budget * clamp(currentResult.S, 0, 1);
+      // Build team data from current state
+      const teamData = {
+        slos: (typeof state !== 'undefined' && state.slos) ? state.slos : [],
+        images: (typeof vulnState !== 'undefined' && vulnState.images) ? vulnState.images : [],
+        tickets: (typeof bugState !== 'undefined' && bugState.tickets) ? bugState.tickets : [],
+        problems: (typeof pmState !== 'undefined' && pmState.problems) ? pmState.problems : []
+      };
       
-      vulnState.images.forEach((image, idx) => {
-        const totalVulns = image.critical + image.high + image.medium + image.low;
-        if (totalVulns > 0) {
-          const savedImages = [...vulnState.images];
-          vulnState.images = vulnState.images.map((img, i) =>
-            i === idx ? { ...img, critical: 0, high: 0, medium: 0, low: 0 } : img
-          );
-          const fixedResult = computeVulnScore(vulnState.method, vulnState.params[vulnState.method]);
-          const fixedScore = vulnState.budget * clamp(fixedResult.S, 0, 1);
-          vulnState.images = savedImages;
-          
-          const opportunity = fixedScore - currentScore;
-          if (opportunity > 0.01) {
-            opportunities.push({
-              category: 'Vulns',
-              categoryColor: '#fb7185',
-              name: image.name,
-              opportunity: opportunity,
-              itemId: `vuln-${idx}`,
-              link: `#vuln-row-${idx}`
-            });
-          }
+      // Build config from current state
+      const currentConfig = {
+        slo: {
+          pointBudget: state?.pointBudget || 35,
+          tierWeights: state?.tierWeights || { p0: 2, p1: 1, p2: 0.5 },
+          method: state?.method || 'exponential',
+          params: state?.params || { exponential: { decay: 0.85 } }
+        },
+        vuln: {
+          budget: vulnState?.budget || 30,
+          weights: vulnState?.weights || { critical: 4, high: 2, medium: 1, low: 0.5 },
+          method: vulnState?.method || 'exponential',
+          params: vulnState?.params || { exponential: { decay: 0.85 } }
+        },
+        bug: {
+          budget: bugState?.budget || 20,
+          weights: bugState?.weights || { p0: 4, p1: 2, p2: 1 },
+          method: bugState?.method || 'exponential',
+          params: bugState?.params || { exponential: { decay: 0.85 } }
+        },
+        pm: {
+          budget: pmState?.budget || 15,
+          severityWeights: pmState?.severityWeights || { sev1: 4, sev2: 2, sev3: 1, sev4: 0.5 },
+          typeWeights: pmState?.typeWeights || { postmortem: 3, actions: 2, metadata: 1 },
+          method: pmState?.method || 'exponential',
+          params: pmState?.params || { exponential: { decay: 0.85 } }
+        }
+      };
+      
+      // Use the shared function from scorecard-compute.js
+      const opportunities = window.ScorecardCompute.calculateOpportunities(teamData, currentConfig, normMethods, '');
+      
+      // Add link property for navigation within the page
+      opportunities.forEach(opp => {
+        if (opp.itemId) {
+          const [category, idx] = opp.itemId.split('-');
+          opp.link = `#${category}-row-${idx}`;
         }
       });
-      }
+      
+      return opportunities;
     } catch (e) {
-      // Vuln state not yet initialized, skip
+      // State not yet initialized, return empty
+      return [];
     }
-    
-    // Bugs: Fix = remove the ticket
-    try {
-      if (typeof window.bugState !== 'undefined' && window.bugState && window.bugState.tickets && typeof window.computeBugScore === 'function') {
-        const bugState = window.bugState;
-        const computeBugScore = window.computeBugScore;
-        const currentResult = computeBugScore(bugState.method, bugState.params[bugState.method]);
-        const currentScore = bugState.budget * clamp(currentResult.S, 0, 1);
-        
-        bugState.tickets.forEach((ticket, idx) => {
-          const savedTickets = [...bugState.tickets];
-          bugState.tickets = bugState.tickets.filter((_, i) => i !== idx);
-          const fixedResult = computeBugScore(bugState.method, bugState.params[bugState.method]);
-          const fixedScore = bugState.budget * clamp(fixedResult.S, 0, 1);
-          bugState.tickets = savedTickets;
-          
-          const opportunity = fixedScore - currentScore;
-          if (opportunity > 0.01) {
-            opportunities.push({
-              category: 'Bugs',
-              categoryColor: '#fde68a',
-              name: ticket.name,
-              opportunity: opportunity,
-              itemId: `bug-${idx}`,
-              link: `#bug-row-${idx}`
-            });
-          }
-        });
-      }
-    } catch (e) {
-      // Bug state not yet initialized, skip
-    }
-    
-    // Postmortems: Fix = remove the problem
-    try {
-      if (typeof window.pmState !== 'undefined' && window.pmState && window.pmState.problems && typeof window.computePmScore === 'function') {
-        const pmState = window.pmState;
-        const computePmScore = window.computePmScore;
-        const currentResult = computePmScore(pmState.method, pmState.params[pmState.method]);
-        const currentScore = pmState.budget * clamp(currentResult.S, 0, 1);
-        
-        pmState.problems.forEach((problem, idx) => {
-          const savedProblems = [...pmState.problems];
-          pmState.problems = pmState.problems.filter((_, i) => i !== idx);
-          const fixedResult = computePmScore(pmState.method, pmState.params[pmState.method]);
-          const fixedScore = pmState.budget * clamp(fixedResult.S, 0, 1);
-          pmState.problems = savedProblems;
-          
-          const opportunity = fixedScore - currentScore;
-          if (opportunity > 0.01) {
-            opportunities.push({
-              category: 'Postmortems',
-              categoryColor: '#c4b5fd',
-              name: problem.incident + ': ' + problem.description,
-              opportunity: opportunity,
-              itemId: `pm-${idx}`,
-              link: `#pm-row-${idx}`
-            });
-          }
-        });
-      }
-    } catch (e) {
-      // Postmortem state not yet initialized, skip
-    }
-    
-    // Sort by opportunity descending
-    opportunities.sort((a, b) => b.opportunity - a.opportunity);
-    
-    return opportunities;
   }
 
-  // ---------- LocalStorage Persistence ----------
-  const STORAGE_KEY = "scorecard-playground-state";
+  // ---------- Persistence ----------
   let allSectionsInitialized = false;
 
   function saveAllState() {
-    if (!allSectionsInitialized) return; // Skip saving during initial load
+    if (!allSectionsInitialized || !currentTeamPath) return;
+    
     try {
-      const allState = {
-        slo: state,
-        vuln: vulnState,
-        bug: bugState,
-        pm: pmState
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(allState));
+      // Save configuration changes
+      window.ScorecardConfig.updateCategoryConfig('slo', {
+        pointBudget: state.pointBudget,
+        tierWeights: state.tierWeights,
+        method: state.method,
+        params: state.params
+      });
+      window.ScorecardConfig.updateCategoryConfig('vuln', {
+        budget: vulnState.budget,
+        weights: vulnState.weights,
+        method: vulnState.method,
+        params: vulnState.params
+      });
+      window.ScorecardConfig.updateCategoryConfig('bug', {
+        budget: bugState.budget,
+        weights: bugState.weights,
+        method: bugState.method,
+        params: bugState.params
+      });
+      window.ScorecardConfig.updateCategoryConfig('pm', {
+        budget: pmState.budget,
+        severityWeights: pmState.severityWeights,
+        typeWeights: pmState.typeWeights,
+        method: pmState.method,
+        params: pmState.params
+      });
+      
+      // Save team data changes
+      saveTeamData(currentTeamPath, {
+        slos: state.slos,
+        images: vulnState.images,
+        tickets: bugState.tickets,
+        problems: pmState.problems
+      });
     } catch (e) {
-      console.warn("Could not save state to localStorage:", e);
+      console.warn("Could not save state:", e);
     }
-  }
-
-  function loadAllState() {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.warn("Could not load state from localStorage:", e);
-    }
-    return null;
   }
 
   // ---------- State ----------
-  const defaultState = () => ({
-    pointBudget: 35,
-    tierWeights: { p0: 2.0, p1: 1.0, p2: 0.5 },
-    method: "exponential",
-    params: {
-      exponential: { decay: 0.85 },
-      linear: { threshold: 10 },
-      inverse: { k: 1.0 },
-      logarithmic: { maxExpected: 20 },
-      sigmoid: { midpoint: 5, steepness: 1.0 },
-      bucket: { buckets: [[0, 1.0], [1, 0.8], [3, 0.5], [6, 0.2], [11, 0.0]] }
-    },
-    slos: [
-      { name: "Checkout latency", ebPct: 60, tier: "p1" },
-      { name: "API availability", ebPct: 80, tier: "p0" },
-      { name: "Job success rate", ebPct: 90, tier: "p2" },
-      { name: "Payment gateway uptime", ebPct: -15, tier: "p0" },
-      { name: "Search response time", ebPct: -40, tier: "p1" }
-    ]
-  });
-
-  // Check for reset query param
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('reset') === '1') {
-    localStorage.removeItem(STORAGE_KEY);
-    // Remove the query param from URL without reload
-    const cleanUrl = window.location.pathname + window.location.hash;
-    window.history.replaceState({}, document.title, cleanUrl);
+  // Load shared configuration
+  const sharedConfig = window.ScorecardConfig.loadConfig();
+  
+  // Current selected team path
+  let currentTeamPath = null;
+  
+  // Load team data from mock data
+  function loadTeamData(path) {
+    const teamData = window.MockData.getMockDataForTeam(path);
+    if (!teamData) return null;
+    
+    return {
+      slos: teamData.slos || [],
+      images: teamData.images || [],
+      tickets: teamData.tickets || [],
+      problems: teamData.problems || []
+    };
+  }
+  
+  // Save team data to mock data
+  function saveTeamData(path, data) {
+    const teamData = {
+      slos: data.slos || [],
+      images: data.images || [],
+      tickets: data.tickets || [],
+      problems: data.problems || []
+    };
+    window.MockData.updateMockDataForTeam(path, teamData);
   }
 
-  // Load saved state or use defaults
-  const savedState = loadAllState();
-  let state = savedState?.slo || defaultState();
+  // Initialize state from first team
+  const allTeams = window.MockData.getAllTeamPaths();
+  currentTeamPath = allTeams[0]?.path || null;
+  
+  const initialTeamData = currentTeamPath ? loadTeamData(currentTeamPath) : { slos: [], images: [], tickets: [], problems: [] };
+  
+  let state = {
+    pointBudget: sharedConfig.slo.pointBudget,
+    tierWeights: sharedConfig.slo.tierWeights,
+    method: sharedConfig.slo.method,
+    params: sharedConfig.slo.params,
+    slos: initialTeamData.slos
+  };
 
   // ---------- DOM ----------
   const el = {
@@ -2724,26 +2759,13 @@ CALCULATION
   // ==========================================================================
 
   // ---------- Vuln State ----------
-  const defaultVulnState = () => ({
-    budget: 30,
-    weights: { critical: 4.0, high: 2.0, medium: 1.0, low: 0.5 },
-    method: "exponential",
-    params: {
-      exponential: { decay: 0.85 },
-      linear: { threshold: 10 },
-      inverse: { k: 1.0 },
-      logarithmic: { maxExpected: 20 },
-      sigmoid: { midpoint: 5, steepness: 1.0 },
-      bucket: { buckets: [[0, 1.0], [1, 0.8], [3, 0.5], [6, 0.2], [11, 0.0]] }
-    },
-    images: [
-      { name: "api-server", critical: 2, high: 5, medium: 12, low: 34 },
-      { name: "worker", critical: 0, high: 1, medium: 3, low: 8 },
-      { name: "frontend", critical: 2, high: 0, medium: 2, low: 15 }
-    ]
-  });
-
-  let vulnState = savedState?.vuln || defaultVulnState();
+  let vulnState = {
+    budget: sharedConfig.vuln.budget,
+    weights: sharedConfig.vuln.weights,
+    method: sharedConfig.vuln.method,
+    params: sharedConfig.vuln.params,
+    images: initialTeamData.images
+  };
   window.vulnState = vulnState;  // Make accessible to calculateOpportunities
 
   // ---------- Vuln DOM ----------
@@ -3292,60 +3314,14 @@ CALCULATION
   // BUG REPORTS SECTION
   // ==========================================================================
 
-  const defaultBugState = () => ({
-    budget: 20,
-    weights: { p0: 4.0, p1: 2.0, p2: 1.0 },
-    method: "exponential",
-    params: {
-      exponential: { decay: 0.85 },
-      linear: { threshold: 10 },
-      inverse: { k: 1.0 },
-      logarithmic: { maxExpected: 20 },
-      sigmoid: { midpoint: 5, steepness: 1.0 },
-      bucket: { buckets: [[0, 1.0], [1, 0.8], [3, 0.5], [6, 0.2], [11, 0.0]] }
-    },
-    tickets: [
-      { name: "BUG-1234", priority: "p0" },
-      { name: "BUG-2345", priority: "p1" },
-      { name: "BUG-3456", priority: "p1" },
-      { name: "BUG-4567", priority: "p1" },
-      { name: "BUG-5678", priority: "p2" },
-      { name: "BUG-6789", priority: "p2" },
-      { name: "BUG-7890", priority: "p2" },
-      { name: "BUG-8901", priority: "p2" },
-      { name: "BUG-9012", priority: "p2" },
-      { name: "BUG-0123", priority: "p2" },
-      { name: "BUG-1357", priority: "p2" },
-      { name: "BUG-2468", priority: "p2" }
-    ]
-  });
-
-  let bugState = savedState?.bug || defaultBugState();
+  let bugState = {
+    budget: sharedConfig.bug.budget,
+    weights: sharedConfig.bug.weights,
+    method: sharedConfig.bug.method,
+    params: sharedConfig.bug.params,
+    tickets: initialTeamData.tickets
+  };
   window.bugState = bugState;  // Make accessible to calculateOpportunities
-  
-  // Migration: convert old counts format to tickets format
-  if (bugState.counts && !bugState.tickets) {
-    bugState.tickets = [];
-    const priorities = ["p0", "p1", "p2"];
-    priorities.forEach(prio => {
-      const count = bugState.counts[prio] || 0;
-      for (let i = 0; i < count; i++) {
-        bugState.tickets.push({ 
-          name: `BUG-${prio.toUpperCase()}-${i + 1}`, 
-          priority: prio 
-        });
-      }
-    });
-    delete bugState.counts;
-  }
-  
-  // Migration: convert old decay format to method/params format
-  if (bugState.decay && !bugState.method) {
-    bugState.method = "exponential";
-    bugState.params = defaultBugState().params;
-    bugState.params.exponential.decay = bugState.decay;
-    delete bugState.decay;
-  }
 
   // ---------- Bug DOM ----------
   const bugEl = {
@@ -3865,71 +3841,15 @@ ${items.map(it => `    ${it.name}: count=${it.count} → s = ${fmt(it.s, 4)}`).j
   // POSTMORTEMS SECTION
   // ==========================================================================
 
-  const defaultPmState = () => ({
-    budget: 15,
-    severityWeights: { sev1: 4.0, sev2: 2.0, sev3: 1.0, sev4: 0.5 },
-    typeWeights: { postmortem: 3.0, actions: 2.0, metadata: 1.0 },
-    method: "exponential",
-    params: {
-      exponential: { decay: 0.85 },
-      linear: { threshold: 10 },
-      inverse: { k: 1.0 },
-      logarithmic: { maxExpected: 20 },
-      sigmoid: { midpoint: 5, steepness: 1.0 },
-      bucket: { buckets: [[0, 1.0], [1, 0.8], [3, 0.5], [6, 0.2], [11, 0.0]] }
-    },
-    problems: [
-      { incident: "ALERT-4721", severity: "sev1", problemType: "actions", description: "Missing root cause analysis" },
-      { incident: "ALERT-3892", severity: "sev2", problemType: "metadata", description: "No timeline documented" },
-      { incident: "ALERT-3892", severity: "sev2", problemType: "actions", description: "Action items not assigned owners" },
-      { incident: "ALERT-1547", severity: "sev3", problemType: "metadata", description: "Impact scope unclear" },
-      { incident: "ALERT-1547", severity: "sev3", problemType: "metadata", description: "Detection time not recorded" },
-      { incident: "ALERT-1547", severity: "sev3", problemType: "postmortem", description: "Postmortem not completed within SLA" }
-    ]
-  });
-
-  let pmState = savedState?.pm || defaultPmState();
+  let pmState = {
+    budget: sharedConfig.pm.budget,
+    severityWeights: sharedConfig.pm.severityWeights,
+    typeWeights: sharedConfig.pm.typeWeights,
+    method: sharedConfig.pm.method,
+    params: sharedConfig.pm.params,
+    problems: initialTeamData.problems
+  };
   window.pmState = pmState;  // Make accessible to calculateOpportunities
-  
-  // Migration: convert old incidents format to problems format
-  if (pmState.incidents && !pmState.problems) {
-    pmState.problems = [];
-    pmState.incidents.forEach(inc => {
-      for (let i = 0; i < (inc.metadata || 0); i++) {
-        pmState.problems.push({
-          incident: inc.name,
-          severity: inc.severity,
-          problemType: "metadata",
-          description: `Missing metadata #${i + 1}`
-        });
-      }
-      for (let i = 0; i < (inc.actions || 0); i++) {
-        pmState.problems.push({
-          incident: inc.name,
-          severity: inc.severity,
-          problemType: "actions",
-          description: `Incomplete action #${i + 1}`
-        });
-      }
-      for (let i = 0; i < (inc.postmortem || 0); i++) {
-        pmState.problems.push({
-          incident: inc.name,
-          severity: inc.severity,
-          problemType: "postmortem",
-          description: `Incomplete postmortem #${i + 1}`
-        });
-      }
-    });
-    delete pmState.incidents;
-  }
-  
-  // Migration: convert old decay format to method/params format
-  if (pmState.decay && !pmState.method) {
-    pmState.method = "exponential";
-    pmState.params = defaultPmState().params;
-    pmState.params.exponential.decay = pmState.decay;
-    delete pmState.decay;
-  }
 
   // ---------- PM DOM ----------
   const pmEl = {
@@ -4544,9 +4464,140 @@ ${items.map(it => `     ${it.name}: weighted=${fmt(it.weightedCount, 2)} → s =
   renderPmTable();
   recomputePm();
 
+  // ---------- Team Selector ----------
+  const teamSelectorEl = document.getElementById('teamSelector');
+  
+  // Populate team selector
+  function populateTeamSelector() {
+    const teams = window.MockData.getAllTeamPaths();
+    teamSelectorEl.innerHTML = teams.map((team, idx) => 
+      `<option value="${idx}">${team.label}</option>`
+    ).join('');
+    teamSelectorEl.value = '0';
+  }
+  
+  // Handle team selection change
+  teamSelectorEl.addEventListener('change', () => {
+    const idx = Number(teamSelectorEl.value);
+    const teams = window.MockData.getAllTeamPaths();
+    if (idx >= 0 && idx < teams.length) {
+      currentTeamPath = teams[idx].path;
+      const teamData = loadTeamData(currentTeamPath);
+      
+      if (teamData) {
+        // Update all state with new team data
+        state.slos = teamData.slos;
+        vulnState.images = teamData.images;
+        bugState.tickets = teamData.tickets;
+        pmState.problems = teamData.problems;
+        
+        // Re-render all sections
+        renderTable();
+        renderVulnTable();
+        renderBugTable();
+        renderPmTable();
+        
+        // Recompute all scores
+        recompute();
+        recomputeVuln();
+        recomputeBug();
+        recomputePm();
+      }
+    }
+  });
+  
+  populateTeamSelector();
+
   // All sections initialized, enable state saving
   allSectionsInitialized = true;
   saveAllState(); // Save initial state
+
+  // ---------- URL Parameter Handling ----------
+  // Handle deep links from dashboard priority work items
+  function handleUrlParameters() {
+    const params = new URLSearchParams(window.location.search);
+    const teamParam = params.get('team');
+    const itemParam = params.get('item');
+    
+    if (!teamParam) return;
+    
+    try {
+      const teamPath = JSON.parse(decodeURIComponent(teamParam));
+      if (!Array.isArray(teamPath)) return;
+      
+      // Find the team index in the selector
+      const teams = window.MockData.getAllTeamPaths();
+      const teamIndex = teams.findIndex(t => 
+        t.path.length === teamPath.length && 
+        t.path.every((p, i) => p === teamPath[i])
+      );
+      
+      if (teamIndex === -1) return;
+      
+      // Select the team
+      teamSelectorEl.value = teamIndex.toString();
+      teamSelectorEl.dispatchEvent(new Event('change'));
+      
+      // If there's an item to scroll to, wait for render then scroll
+      if (itemParam) {
+        const decodedItem = decodeURIComponent(itemParam);
+        // Convert itemId (e.g., 'slo-0') to row ID (e.g., 'slo-row-0')
+        const parts = decodedItem.split('-');
+        if (parts.length === 2) {
+          const [category, idx] = parts;
+          const rowId = `${category}-row-${idx}`;
+          
+          // Wait for DOM to update, then scroll and highlight
+          setTimeout(() => {
+            const rowEl = document.getElementById(rowId);
+            if (rowEl) {
+              // Scroll to the row
+              rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              
+              // Add highlight effect
+              rowEl.style.transition = 'background-color 0.3s ease';
+              rowEl.style.backgroundColor = 'rgba(147, 197, 253, 0.3)';
+              
+              // Remove highlight after a moment
+              setTimeout(() => {
+                rowEl.style.backgroundColor = '';
+                // Focus the first input in the row
+                const firstInput = rowEl.querySelector('input, select');
+                if (firstInput) {
+                  firstInput.focus();
+                }
+              }, 2000);
+            } else {
+              // If row not found, scroll to the section
+              const sectionMap = {
+                'slo': 'section-slos',
+                'vuln': 'section-vulns',
+                'bug': 'section-bugs',
+                'pm': 'section-postmortems'
+              };
+              const sectionId = sectionMap[category];
+              if (sectionId) {
+                const sectionEl = document.getElementById(sectionId);
+                if (sectionEl) {
+                  sectionEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }
+            }
+          }, 100);
+        }
+      }
+      
+      // Clean up URL without reloading
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+      
+    } catch (e) {
+      console.warn('Could not parse URL parameters:', e);
+    }
+  }
+  
+  // Run URL parameter handling after a short delay to ensure everything is rendered
+  setTimeout(handleUrlParameters, 50);
 </script>
 </body>
 </html>
