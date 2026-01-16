@@ -66,43 +66,6 @@
       margin: 0 0 14px;
     }
 
-    /* Stacked bar visualization */
-    .stacked-bar {
-      display: flex;
-      height: 32px;
-      border-radius: 8px;
-      overflow: hidden;
-      background: rgba(0,0,0,.3);
-      border: 1px solid var(--border);
-    }
-
-    .stacked-segment {
-      position: relative;
-      min-width: 0;
-      transition: flex .3s ease;
-      overflow: hidden;
-    }
-
-    .stacked-segment .segment-fill {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: 0;
-      width: 0%;
-      transition: width .3s ease;
-    }
-
-    .slo-segment { background: rgba(147,197,253,.25); }
-    .slo-segment .segment-fill { background: #93c5fd; }
-    
-    .vuln-segment { background: rgba(251,113,133,.25); }
-    .vuln-segment .segment-fill { background: #fb7185; }
-    
-    .bugs-segment { background: rgba(253,224,138,.25); }
-    .bugs-segment .segment-fill { background: #fde68a; }
-
-
-
     /* Score summary */
     .score-summary {
       display: flex;
@@ -955,20 +918,6 @@
         <div class="score-total">
           <span class="score-earned" id="sidebarTotalScore">—</span>
           <span class="score-max"> / <span id="sidebarTotalMax">60</span></span>
-        </div>
-        <div class="stacked-bar">
-          <div class="stacked-segment slo-segment" id="stackedSloSegment">
-            <div class="segment-fill" id="stackedSloFill"></div>
-          </div>
-          <div class="stacked-segment vuln-segment" id="stackedVulnSegment">
-            <div class="segment-fill" id="stackedVulnFill"></div>
-          </div>
-          <div class="stacked-segment bugs-segment" id="stackedBugsSegment">
-            <div class="segment-fill" id="stackedBugsFill"></div>
-          </div>
-          <div class="stacked-segment" id="stackedPmSegment" style="background: rgba(196,181,253,.25);">
-            <div class="segment-fill" id="stackedPmFill" style="background: #c4b5fd;"></div>
-          </div>
         </div>
       </div>
 
@@ -2078,15 +2027,6 @@
     // Totals
     totalScore: document.getElementById("sidebarTotalScore"),
     totalMax: document.getElementById("sidebarTotalMax"),
-    // Stacked bar segments
-    sloSegment: document.getElementById("stackedSloSegment"),
-    vulnSegment: document.getElementById("stackedVulnSegment"),
-    bugsSegment: document.getElementById("stackedBugsSegment"),
-    pmSegment: document.getElementById("stackedPmSegment"),
-    sloFill: document.getElementById("stackedSloFill"),
-    vulnFill: document.getElementById("stackedVulnFill"),
-    bugsFill: document.getElementById("stackedBugsFill"),
-    pmFill: document.getElementById("stackedPmFill"),
     // Category rows
     sloScore: document.getElementById("sidebarSloScore"),
     sloPct: document.getElementById("sidebarSloPct"),
@@ -2146,23 +2086,12 @@
     sidebarEl.totalScore.textContent = Math.round(total);
     sidebarEl.totalMax.textContent = Math.round(totalMax);
     
-    // Update stacked bar segment widths (proportional to budget)
+    // Update category rows
     if (totalMax > 0) {
-      sidebarEl.sloSegment.style.flex = currentScores.sloMax;
-      sidebarEl.vulnSegment.style.flex = currentScores.vulnsMax;
-      sidebarEl.bugsSegment.style.flex = currentScores.bugsMax;
-      sidebarEl.pmSegment.style.flex = currentScores.pmMax;
-      
-      // Update segment fills (consumption within each segment)
       const sloPct = currentScores.sloMax > 0 ? (currentScores.slo / currentScores.sloMax) : 0;
       const vulnPct = currentScores.vulnsMax > 0 ? (currentScores.vulns / currentScores.vulnsMax) : 0;
       const bugsPct = currentScores.bugsMax > 0 ? (currentScores.bugs / currentScores.bugsMax) : 0;
       const pmPct = currentScores.pmMax > 0 ? (currentScores.pm / currentScores.pmMax) : 0;
-      
-      sidebarEl.sloFill.style.width = (sloPct * 100).toFixed(1) + "%";
-      sidebarEl.vulnFill.style.width = (vulnPct * 100).toFixed(1) + "%";
-      sidebarEl.bugsFill.style.width = (bugsPct * 100).toFixed(1) + "%";
-      sidebarEl.pmFill.style.width = (pmPct * 100).toFixed(1) + "%";
       
       // Update category rows
       // SLOs
