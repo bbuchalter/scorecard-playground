@@ -519,6 +519,10 @@
     const teams = MockData.getAllTeamPaths();
     if (idx >= 0 && idx < teams.length) {
       currentTeamPath = teams[idx].path;
+      // Save selected team to localStorage for cross-page persistence
+      try {
+        localStorage.setItem('selectedTeamPath', JSON.stringify(currentTeamPath));
+      } catch (e) { /* ignore storage errors */ }
       loadTeamData();
     }
   });
@@ -782,12 +786,10 @@
     const totalScore = sloResult.score + vulnResult.score + bugResult.score + pmResult.score;
     const totalMax = config.slo.pointBudget + config.vuln.budget + config.bug.budget + config.pm.budget;
 
-    // Helper for color class
+    // Helper for color class (using shared function)
     const getColorClass = (score, max) => {
       const pct = max > 0 ? score / max : 0;
-      if (pct >= 0.7) return 'good';
-      if (pct >= 0.4) return 'warn';
-      return 'bad';
+      return compute.getScoreClassSimple(pct);
     };
 
     // Update preview boxes
@@ -848,7 +850,7 @@
   // ========== INITIALIZATION ==========
   populateTeamSelector();
   
-  // Check for team parameter in URL
+  // Check for team parameter in URL, or load from localStorage
   const urlParams = new URLSearchParams(window.location.search);
   const teamParam = urlParams.get('team');
   
@@ -865,12 +867,33 @@
         if (teamIndex !== -1) {
           teamSelectorEl.value = teamIndex.toString();
           currentTeamPath = teams[teamIndex].path;
+          // Save to localStorage for persistence
+          try {
+            localStorage.setItem('selectedTeamPath', JSON.stringify(currentTeamPath));
+          } catch (e) { /* ignore */ }
           loadTeamData();
         }
       }
     } catch (e) {
       // Invalid JSON, ignore
     }
+  } else {
+    // No URL param, check localStorage for saved team selection
+    try {
+      const savedTeamPath = localStorage.getItem('selectedTeamPath');
+      if (savedTeamPath) {
+        const teamPath = JSON.parse(savedTeamPath);
+        const teams = MockData.getAllTeamPaths();
+        const teamIndex = teams.findIndex(t => 
+          JSON.stringify(t.path) === JSON.stringify(teamPath)
+        );
+        if (teamIndex !== -1) {
+          teamSelectorEl.value = teamIndex.toString();
+          currentTeamPath = teams[teamIndex].path;
+          loadTeamData();
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
 </script>
 </body>

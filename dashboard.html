@@ -359,7 +359,6 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
-      margin-bottom: 30px;
     }
 
     @media (max-width: 900px) {
@@ -377,6 +376,7 @@
       background: rgba(255,255,255,.03);
       border-radius: 16px;
       border: 1px solid var(--border);
+      position: relative;
     }
 
     .hero-grade-title {
@@ -452,6 +452,7 @@
       padding: 24px;
       display: flex;
       flex-direction: column;
+      position: relative;
     }
 
     .priority-work-title {
@@ -540,21 +541,42 @@
       text-align: center;
       padding: 16px 0;
     }
+
+    .hero-actions {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+    }
+
+    .hero-section-wrapper {
+      margin-bottom: 30px;
+    }
+
+    .data-editor-link {
+      display: inline-block;
+      text-align: center;
+      padding: 10px 14px;
+      background: rgba(147,197,253,.12);
+      border: 1px solid rgba(147,197,253,.24);
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      text-decoration: none;
+      transition: background .15s, border-color .15s;
+    }
+
+    .data-editor-link:hover {
+      background: rgba(147,197,253,.20);
+      border-color: rgba(147,197,253,.40);
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
-        <div>
-          <h1 class="title">Company Scorecards</h1>
-          <div class="breadcrumb" id="breadcrumb"></div>
-        </div>
-        <nav style="display: flex; gap: 12px;">
-          <a href="index.html" class="nav-btn">⚙️ Config</a>
-          <a href="data-editor.html" class="nav-btn">✏️ Data Editor</a>
-        </nav>
-      </div>
+      <h1 class="title">Company Scorecards</h1>
+      <div class="breadcrumb" id="breadcrumb"></div>
     </div>
 
     <div id="heroGradeContainer"></div>
@@ -1012,34 +1034,10 @@
   let navigationPath = []; // Array to track path: [] = top-level, ['Applications'] = group, ['Applications', 'Backend API'] = team, ['Applications', 'Backend API', 'API Gateway'] = sub-team
   let chartInstances = {};
 
-  // ========== HELPER FUNCTIONS ==========
-  function getScoreClass(score) {
-    if (score >= 90) return 'excellent';
-    if (score >= 80) return 'good';
-    if (score >= 70) return 'fair';
-    if (score >= 60) return 'at-risk';
-    return 'critical';
-  }
-
-  function getLetterGrade(score) {
-    if (score >= 90) return 'A';
-    if (score >= 80) return 'B';
-    if (score >= 70) return 'C';
-    if (score >= 60) return 'D';
-    return 'F';
-  }
-
-  function getScoreColor(score) {
-    const className = getScoreClass(score);
-    const colors = {
-      'excellent': '#6ee7b7',
-      'good': '#5eead4',
-      'fair': '#fde68a',
-      'at-risk': '#fb923c',
-      'critical': '#fb7185'
-    };
-    return colors[className];
-  }
+  // ========== HELPER FUNCTIONS (from shared scorecard-compute.js) ==========
+  const getScoreClass = compute.getScoreClass;
+  const getLetterGrade = compute.getLetterGrade;
+  const getScoreColor = compute.getScoreColor;
 
   function createSparkline(canvasId, data, score) {
     const ctx = document.getElementById(canvasId);
@@ -1122,6 +1120,14 @@
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  function getConfigUrl() {
+    if (navigationPath.length === 0) {
+      return 'index.html';
+    }
+    const teamParam = encodeURIComponent(JSON.stringify(navigationPath));
+    return `index.html?team=${teamParam}`;
   }
 
   function calculatePriorityWork() {
@@ -1230,7 +1236,7 @@
     
     // Use the shared function from scorecard-compute.js
     const teamsToProcess = getTeamsToProcess();
-    return compute.calculateOpportunitiesForTeams(teamsToProcess, config, normMethods, 10);
+    return compute.calculateOpportunitiesForTeams(teamsToProcess, config, normMethods, 5);
   }
 
   function renderPriorityWork() {
@@ -1347,19 +1353,27 @@
       const letterGrade = getLetterGrade(overallAvg);
       
       container.innerHTML = `
-        <div class="hero-section">
-          <div class="hero-grade">
-            <div class="hero-grade-title">Overall R&D Grade</div>
-            <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
-            <div class="hero-grade-score">${overallAvg}/100</div>
-            <div class="hero-sparkline-container">
-              <canvas id="chart-hero-grade"></canvas>
+        <div class="hero-section-wrapper">
+          <div class="hero-section">
+            <div class="hero-grade">
+              <div class="hero-grade-title">R&D</div>
+              <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
+              <div class="hero-grade-score">${overallAvg}/100</div>
+              <div class="hero-sparkline-container">
+                <canvas id="chart-hero-grade"></canvas>
+              </div>
+              <div class="hero-actions">
+                <a href="${getConfigUrl()}" class="data-editor-link">⚙️ Scorecard Config</a>
+              </div>
             </div>
-          </div>
-          <div class="priority-work-panel">
-            <h3 class="priority-work-title">Priority Work</h3>
-            <div class="priority-work-items">
-              ${renderPriorityWork()}
+            <div class="priority-work-panel">
+              <h3 class="priority-work-title">Top 5 Opportunities</h3>
+              <div class="priority-work-items">
+                ${renderPriorityWork()}
+              </div>
+              <div class="hero-actions">
+                <a href="data-editor.html" class="data-editor-link">✏️ Data Editor</a>
+              </div>
             </div>
           </div>
         </div>
@@ -1378,19 +1392,27 @@
       const letterGrade = getLetterGrade(avg);
       
       container.innerHTML = `
-        <div class="hero-section">
-          <div class="hero-grade">
-            <div class="hero-grade-title">${group.name} Grade</div>
-            <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
-            <div class="hero-grade-score">${avg}/100</div>
-            <div class="hero-sparkline-container">
-              <canvas id="chart-hero-grade"></canvas>
+        <div class="hero-section-wrapper">
+          <div class="hero-section">
+            <div class="hero-grade">
+              <div class="hero-grade-title">${group.name}</div>
+              <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
+              <div class="hero-grade-score">${avg}/100</div>
+              <div class="hero-sparkline-container">
+                <canvas id="chart-hero-grade"></canvas>
+              </div>
+              <div class="hero-actions">
+                <a href="${getConfigUrl()}" class="data-editor-link">⚙️ Scorecard Config</a>
+              </div>
             </div>
-          </div>
-          <div class="priority-work-panel">
-            <h3 class="priority-work-title">Priority Work</h3>
-            <div class="priority-work-items">
-              ${renderPriorityWork()}
+            <div class="priority-work-panel">
+              <h3 class="priority-work-title">Top 5 Opportunities</h3>
+              <div class="priority-work-items">
+                ${renderPriorityWork()}
+              </div>
+              <div class="hero-actions">
+                <a href="data-editor.html" class="data-editor-link">✏️ Data Editor</a>
+              </div>
             </div>
           </div>
         </div>
@@ -1421,19 +1443,27 @@
       const letterGrade = getLetterGrade(avg);
       
       container.innerHTML = `
-        <div class="hero-section">
-          <div class="hero-grade">
-            <div class="hero-grade-title">${teamName} Grade</div>
-            <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
-            <div class="hero-grade-score">${avg}/100</div>
-            <div class="hero-sparkline-container">
-              <canvas id="chart-hero-grade"></canvas>
+        <div class="hero-section-wrapper">
+          <div class="hero-section">
+            <div class="hero-grade">
+              <div class="hero-grade-title">${teamName}</div>
+              <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
+              <div class="hero-grade-score">${avg}/100</div>
+              <div class="hero-sparkline-container">
+                <canvas id="chart-hero-grade"></canvas>
+              </div>
+              <div class="hero-actions">
+                <a href="${getConfigUrl()}" class="data-editor-link">⚙️ Scorecard Config</a>
+              </div>
             </div>
-          </div>
-          <div class="priority-work-panel">
-            <h3 class="priority-work-title">Priority Work</h3>
-            <div class="priority-work-items">
-              ${renderPriorityWork()}
+            <div class="priority-work-panel">
+              <h3 class="priority-work-title">Top 5 Opportunities</h3>
+              <div class="priority-work-items">
+                ${renderPriorityWork()}
+              </div>
+              <div class="hero-actions">
+                <a href="data-editor.html" class="data-editor-link">✏️ Data Editor</a>
+              </div>
             </div>
           </div>
         </div>
@@ -1464,19 +1494,27 @@
       const letterGrade = getLetterGrade(avg);
       
       container.innerHTML = `
-        <div class="hero-section">
-          <div class="hero-grade">
-            <div class="hero-grade-title">${subTeamName} Grade</div>
-            <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
-            <div class="hero-grade-score">${avg}/100</div>
-            <div class="hero-sparkline-container">
-              <canvas id="chart-hero-grade"></canvas>
+        <div class="hero-section-wrapper">
+          <div class="hero-section">
+            <div class="hero-grade">
+              <div class="hero-grade-title">${subTeamName}</div>
+              <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
+              <div class="hero-grade-score">${avg}/100</div>
+              <div class="hero-sparkline-container">
+                <canvas id="chart-hero-grade"></canvas>
+              </div>
+              <div class="hero-actions">
+                <a href="${getConfigUrl()}" class="data-editor-link">⚙️ Scorecard Config</a>
+              </div>
             </div>
-          </div>
-          <div class="priority-work-panel">
-            <h3 class="priority-work-title">Priority Work</h3>
-            <div class="priority-work-items">
-              ${renderPriorityWork()}
+            <div class="priority-work-panel">
+              <h3 class="priority-work-title">Top 5 Opportunities</h3>
+              <div class="priority-work-items">
+                ${renderPriorityWork()}
+              </div>
+              <div class="hero-actions">
+                <a href="data-editor.html" class="data-editor-link">✏️ Data Editor</a>
+              </div>
             </div>
           </div>
         </div>

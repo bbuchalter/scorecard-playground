@@ -218,7 +218,7 @@ function getLetterGrade(score) {
 }
 
 /**
- * Get score class for styling
+ * Get score class for styling (5-tier: excellent, good, fair, at-risk, critical)
  */
 function getScoreClass(score) {
   if (score >= 90) return 'excellent';
@@ -226,6 +226,18 @@ function getScoreClass(score) {
   if (score >= 70) return 'fair';
   if (score >= 60) return 'at-risk';
   return 'critical';
+}
+
+/**
+ * Get simplified score class for styling (3-tier: good, warn, bad)
+ * Works with either percentage (0-1) or score (0-100)
+ */
+function getScoreClassSimple(value) {
+  // Convert percentage to score if needed
+  const score = value <= 1 ? value * 100 : value;
+  if (score >= 80) return 'good';
+  if (score >= 60) return 'warn';
+  return 'bad';
 }
 
 /**
@@ -404,6 +416,7 @@ if (typeof module !== 'undefined' && module.exports) {
     calculateOpportunitiesForTeams,
     getLetterGrade,
     getScoreClass,
+    getScoreClassSimple,
     getScoreColor,
     clamp,
     fmt,
@@ -423,6 +436,7 @@ if (typeof window !== 'undefined') {
     calculateOpportunitiesForTeams,
     getLetterGrade,
     getScoreClass,
+    getScoreClassSimple,
     getScoreColor,
     clamp,
     fmt,

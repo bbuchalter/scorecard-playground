@@ -1081,7 +1081,7 @@
 
       <!-- Dashboard Link -->
       <a href="dashboard.html" class="dashboard-link" id="dashboardLink">
-        📊 See Dashboard
+        📊 Scorecard Dashboard
       </a>
 
       <!-- Top Opportunities List -->
@@ -1820,6 +1820,8 @@
   const clamp = window.ScorecardCompute.clamp;
   const fmt = window.ScorecardCompute.fmt;
   const fmt2 = window.ScorecardCompute.fmt2;
+  const getScoreClassSimple = window.ScorecardCompute.getScoreClassSimple;
+  const getLetterGrade = window.ScorecardCompute.getLetterGrade;
 
   // ---------- Normalization Methods (from shared config module) ----------
   const normMethods = window.ScorecardConfig.normMethods;
@@ -2114,21 +2116,9 @@
     const totalMax = currentScores.sloMax + currentScores.vulnsMax + currentScores.bugsMax + currentScores.pmMax;
     const totalPct = totalMax > 0 ? (total / totalMax) : 0;
     
-    // Helper for score color class
-    const getScoreClass = (pct) => {
-      if (pct >= 0.7) return "good";
-      if (pct >= 0.4) return "warn";
-      return "bad";
-    };
-    
-    // Helper for letter grade
-    const getGrade = (pct) => {
-      if (pct >= 0.9) return "A";
-      if (pct >= 0.8) return "B";
-      if (pct >= 0.7) return "C";
-      if (pct >= 0.6) return "D";
-      return "F";
-    };
+    // Use shared helper functions from scorecard-compute.js
+    const getScoreClass = getScoreClassSimple;
+    const getGrade = (pct) => getLetterGrade(pct * 100);
     
     // Update grade badge
     const grade = getGrade(totalPct);
@@ -4518,6 +4508,10 @@ ${items.map(it => `     ${it.name}: weighted=${fmt(it.weightedCount, 2)} → s =
     const teams = window.MockData.getAllTeamPaths();
     if (idx >= 0 && idx < teams.length) {
       currentTeamPath = teams[idx].path;
+      // Save selected team to localStorage for cross-page persistence
+      try {
+        localStorage.setItem('selectedTeamPath', JSON.stringify(currentTeamPath));
+      } catch (e) { /* ignore storage errors */ }
       const teamData = loadTeamData(currentTeamPath);
       
       if (teamData) {
@@ -4561,7 +4555,25 @@ ${items.map(it => `     ${it.name}: weighted=${fmt(it.weightedCount, 2)} → s =
     const teamParam = params.get('team');
     const itemParam = params.get('item');
     
-    if (!teamParam) return;
+    // If no URL param, check localStorage for saved team selection
+    if (!teamParam) {
+      try {
+        const savedTeamPath = localStorage.getItem('selectedTeamPath');
+        if (savedTeamPath) {
+          const teamPath = JSON.parse(savedTeamPath);
+          const teams = window.MockData.getAllTeamPaths();
+          const teamIndex = teams.findIndex(t => 
+            t.path.length === teamPath.length && 
+            t.path.every((p, i) => p === teamPath[i])
+          );
+          if (teamIndex !== -1) {
+            teamSelectorEl.value = teamIndex.toString();
+            teamSelectorEl.dispatchEvent(new Event('change'));
+          }
+        }
+      } catch (e) { /* ignore */ }
+      return;
+    }
     
     try {
       const teamPath = JSON.parse(decodeURIComponent(teamParam));
