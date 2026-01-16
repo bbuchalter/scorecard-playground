@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mock Data Editor - Company Scorecard</title>
+  <script src="scorecard-config.js"></script>
+  <script src="scorecard-compute.js"></script>
+  <script src="mock-data.js"></script>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #111935;
+      --panel2: #0f1730;
+      --text: #e9eefc;
+      --muted: #a9b4d6;
+      --border: rgba(255,255,255,.10);
+      --good: #6ee7b7;
+      --warn: #fde68a;
+      --bad: #fb7185;
+      --accent: #93c5fd;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: radial-gradient(1200px 600px at 10% 10%, rgba(147,197,253,.14), transparent),
+                  radial-gradient(1000px 600px at 90% 20%, rgba(110,231,183,.10), transparent),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .header-left {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .title {
+      font-size: 32px;
+      font-weight: 800;
+      margin: 0 0 8px 0;
+      letter-spacing: -0.8px;
+    }
+
+    .subtitle {
+      font-size: 15px;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: rgba(147,197,253,.16);
+      border: 1px solid rgba(147,197,253,.35);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: .2px;
+      transition: transform .05s ease, background .15s;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 14px;
+    }
+
+    .btn:hover {
+      background: rgba(147,197,253,.22);
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn.secondary {
+      background: rgba(255,255,255,.06);
+      border-color: var(--border);
+    }
+
+    .btn.secondary:hover {
+      background: rgba(255,255,255,.10);
+    }
+
+    .btn.danger {
+      background: rgba(251,113,133,.14);
+      border-color: rgba(251,113,133,.35);
+    }
+
+    .btn.danger:hover {
+      background: rgba(251,113,133,.20);
+    }
+
+    .btn.success {
+      background: rgba(110,231,183,.14);
+      border-color: rgba(110,231,183,.35);
+    }
+
+    .btn.success:hover {
+      background: rgba(110,231,183,.20);
+    }
+
+    .team-selector-panel {
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.30);
+    }
+
+    .team-selector-panel h2 {
+      margin: 0 0 16px 0;
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: .2px;
+      text-transform: uppercase;
+    }
+
+    .selector-row {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .selector-row label {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .selector-row select {
+      width: 100%;
+      background: rgba(0,0,0,.22);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 12px 14px;
+      outline: none;
+      font-size: 15px;
+      font-family: var(--sans);
+    }
+
+    .actions-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .preview-panel {
+      background: linear-gradient(135deg, rgba(147,197,253,.08), rgba(110,231,183,.05));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+
+    .preview-box {
+      background: rgba(0,0,0,.25);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .preview-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 8px;
+    }
+
+    .preview-score {
+      font-size: 32px;
+      font-weight: 800;
+      font-family: var(--mono);
+      margin-bottom: 4px;
+    }
+
+    .preview-score.good { color: var(--good); }
+    .preview-score.warn { color: var(--warn); }
+    .preview-score.bad { color: var(--bad); }
+
+    .preview-sublabel {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .section {
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.30);
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 0 0 16px 0;
+      color: var(--text);
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    thead th {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: left;
+      padding: 12px 10px;
+      background: rgba(0,0,0,.18);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+    }
+
+    tbody td {
+      padding: 12px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      vertical-align: middle;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(255,255,255,.02);
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      background: rgba(0,0,0,.22);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 10px;
+      outline: none;
+      font-family: var(--sans);
+    }
+
+    input[type="text"]:focus,
+    input[type="number"]:focus,
+    select:focus {
+      border-color: var(--accent);
+      background: rgba(0,0,0,.30);
+    }
+
+    tbody input[type="text"] {
+      width: 150px;
+    }
+
+    tbody input[type="number"] {
+      width: 80px;
+    }
+
+    tbody select {
+      width: 90px;
+    }
+
+    .add-row-container {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .mono {
+      font-family: var(--mono);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-left">
+        <h1 class="title">Mock Data Editor</h1>
+        <p class="subtitle">Edit raw data for teams across your organization</p>
+      </div>
+      <div class="nav-links">
+        <a href="index.html" class="btn">⚙️ Configuration</a>
+        <a href="dashboard.html" class="btn secondary">📊 Dashboard</a>
+      </div>
+    </div>
+
+    <!-- Team Selector -->
+    <div class="team-selector-panel">
+      <h2>Select Team</h2>
+      <div class="selector-row">
+        <label>
+          <select id="teamSelector">
+            <option value="">Loading teams...</option>
+          </select>
+        </label>
+        <div class="actions-row">
+          <button class="btn success" id="saveBtn">💾 Save Changes</button>
+          <button class="btn secondary" id="generateBtn">🎲 Generate Random</button>
+          <button class="btn danger" id="resetAllBtn">🔄 Reset All Data</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Preview -->
+    <div class="preview-panel">
+      <div class="preview-box">
+        <div class="preview-label">SLOs</div>
+        <div class="preview-score" id="previewSlo">—</div>
+        <div class="preview-sublabel">/ <span id="previewSloMax">—</span></div>
+      </div>
+      <div class="preview-box">
+        <div class="preview-label">Vulns</div>
+        <div class="preview-score" id="previewVuln">—</div>
+        <div class="preview-sublabel">/ <span id="previewVulnMax">—</span></div>
+      </div>
+      <div class="preview-box">
+        <div class="preview-label">Bugs</div>
+        <div class="preview-score" id="previewBug">—</div>
+        <div class="preview-sublabel">/ <span id="previewBugMax">—</span></div>
+      </div>
+      <div class="preview-box">
+        <div class="preview-label">Postmortems</div>
+        <div class="preview-score" id="previewPm">—</div>
+        <div class="preview-sublabel">/ <span id="previewPmMax">—</span></div>
+      </div>
+      <div class="preview-box">
+        <div class="preview-label">Total Score</div>
+        <div class="preview-score" id="previewTotal">—</div>
+        <div class="preview-sublabel">/ <span id="previewTotalMax">—</span></div>
+      </div>
+    </div>
+
+    <!-- SLOs Section -->
+    <div class="section">
+      <h2 class="section-title">SLOs</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>SLO Name</th>
+            <th>Error Budget %</th>
+            <th>Tier</th>
+            <th style="width: 100px;"></th>
+          </tr>
+        </thead>
+        <tbody id="sloTbody"></tbody>
+      </table>
+      <div class="add-row-container">
+        <button class="btn" id="addSlo">+ Add SLO</button>
+      </div>
+    </div>
+
+    <!-- Vulnerabilities Section -->
+    <div class="section">
+      <h2 class="section-title">Container Vulnerabilities</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Image Name</th>
+            <th>Critical</th>
+            <th>High</th>
+            <th>Medium</th>
+            <th>Low</th>
+            <th style="width: 100px;"></th>
+          </tr>
+        </thead>
+        <tbody id="vulnTbody"></tbody>
+      </table>
+      <div class="add-row-container">
+        <button class="btn" id="addVuln">+ Add Image</button>
+      </div>
+    </div>
+
+    <!-- Bugs Section -->
+    <div class="section">
+      <h2 class="section-title">Bug Tickets</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Ticket ID</th>
+            <th>Priority</th>
+            <th style="width: 100px;"></th>
+          </tr>
+        </thead>
+        <tbody id="bugTbody"></tbody>
+      </table>
+      <div class="add-row-container">
+        <button class="btn" id="addBug">+ Add Ticket</button>
+      </div>
+    </div>
+
+    <!-- Postmortems Section -->
+    <div class="section">
+      <h2 class="section-title">Postmortem Problems</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Incident ID</th>
+            <th>Severity</th>
+            <th>Problem Type</th>
+            <th>Description</th>
+            <th style="width: 100px;"></th>
+          </tr>
+        </thead>
+        <tbody id="pmTbody"></tbody>
+      </table>
+      <div class="add-row-container">
+        <button class="btn" id="addPm">+ Add Problem</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Load configuration and modules
+  const config = window.ScorecardConfig.loadConfig();
+  const normMethods = window.ScorecardConfig.normMethods;
+  const compute = window.ScorecardCompute;
+  const MockData = window.MockData;
+
+  // Current state
+  let currentTeamPath = null;
+  let currentTeamData = {
+    slos: [],
+    images: [],
+    tickets: [],
+    problems: []
+  };
+
+  // DOM elements
+  const teamSelectorEl = document.getElementById('teamSelector');
+  const saveBtn = document.getElementById('saveBtn');
+  const generateBtn = document.getElementById('generateBtn');
+  const resetAllBtn = document.getElementById('resetAllBtn');
+
+  // Helper to escape HTML
+  function escapeHtml(s) {
+    return String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+  }
+
+  // ========== TEAM SELECTOR ==========
+  function populateTeamSelector() {
+    const teams = MockData.getAllTeamPaths();
+    teamSelectorEl.innerHTML = teams.map((team, idx) =>
+      `<option value="${idx}">${team.label}</option>`
+    ).join('');
+    
+    // Select first team
+    if (teams.length > 0) {
+      teamSelectorEl.value = '0';
+      currentTeamPath = teams[0].path;
+      loadTeamData();
+    }
+  }
+
+  function loadTeamData() {
+    if (!currentTeamPath) return;
+    
+    const data = MockData.getMockDataForTeam(currentTeamPath);
+    if (data) {
+      currentTeamData = {
+        slos: data.slos || [],
+        images: data.images || [],
+        tickets: data.tickets || [],
+        problems: data.problems || []
+      };
+      renderAll();
+      updatePreview();
+    }
+  }
+
+  teamSelectorEl.addEventListener('change', () => {
+    const idx = Number(teamSelectorEl.value);
+    const teams = MockData.getAllTeamPaths();
+    if (idx >= 0 && idx < teams.length) {
+      currentTeamPath = teams[idx].path;
+      loadTeamData();
+    }
+  });
+
+  // ========== SLO TABLE ==========
+  function renderSloTable() {
+    const tbody = document.getElementById('sloTbody');
+    tbody.innerHTML = '';
+
+    if (currentTeamData.slos.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No SLOs defined. Click "+ Add SLO" to add one.</td></tr>';
+      return;
+    }
+
+    currentTeamData.slos.forEach((slo, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" value="${escapeHtml(slo.name)}" data-idx="${idx}" data-field="name" /></td>
+        <td><input type="number" value="${slo.ebPct}" min="-100" max="100" step="1" data-idx="${idx}" data-field="ebPct" /></td>
+        <td>
+          <select data-idx="${idx}" data-field="tier">
+            <option value="p0" ${slo.tier === 'p0' ? 'selected' : ''}>p0</option>
+            <option value="p1" ${slo.tier === 'p1' ? 'selected' : ''}>p1</option>
+            <option value="p2" ${slo.tier === 'p2' ? 'selected' : ''}>p2</option>
+          </select>
+        </td>
+        <td><button class="btn danger" data-idx="${idx}">Remove</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Add event listeners
+    tbody.querySelectorAll('input, select').forEach(el => {
+      el.addEventListener('input', handleSloChange);
+      el.addEventListener('change', handleSloChange);
+    });
+
+    tbody.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.idx);
+        currentTeamData.slos.splice(idx, 1);
+        renderSloTable();
+        updatePreview();
+      });
+    });
+  }
+
+  function handleSloChange(e) {
+    const idx = Number(e.target.dataset.idx);
+    const field = e.target.dataset.field;
+    if (field === 'ebPct') {
+      currentTeamData.slos[idx][field] = Number(e.target.value);
+    } else {
+      currentTeamData.slos[idx][field] = e.target.value;
+    }
+    updatePreview();
+  }
+
+  document.getElementById('addSlo').addEventListener('click', () => {
+    currentTeamData.slos.push({
+      name: `New SLO ${currentTeamData.slos.length + 1}`,
+      ebPct: 50,
+      tier: 'p1'
+    });
+    renderSloTable();
+    updatePreview();
+  });
+
+  // ========== VULN TABLE ==========
+  function renderVulnTable() {
+    const tbody = document.getElementById('vulnTbody');
+    tbody.innerHTML = '';
+
+    if (currentTeamData.images.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No images defined. Click "+ Add Image" to add one.</td></tr>';
+      return;
+    }
+
+    currentTeamData.images.forEach((img, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" value="${escapeHtml(img.name)}" data-idx="${idx}" data-field="name" /></td>
+        <td><input type="number" value="${img.critical}" min="0" data-idx="${idx}" data-field="critical" /></td>
+        <td><input type="number" value="${img.high}" min="0" data-idx="${idx}" data-field="high" /></td>
+        <td><input type="number" value="${img.medium}" min="0" data-idx="${idx}" data-field="medium" /></td>
+        <td><input type="number" value="${img.low}" min="0" data-idx="${idx}" data-field="low" /></td>
+        <td><button class="btn danger" data-idx="${idx}">Remove</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('input').forEach(el => {
+      el.addEventListener('input', handleVulnChange);
+    });
+
+    tbody.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.idx);
+        currentTeamData.images.splice(idx, 1);
+        renderVulnTable();
+        updatePreview();
+      });
+    });
+  }
+
+  function handleVulnChange(e) {
+    const idx = Number(e.target.dataset.idx);
+    const field = e.target.dataset.field;
+    if (field === 'name') {
+      currentTeamData.images[idx][field] = e.target.value;
+    } else {
+      currentTeamData.images[idx][field] = Number(e.target.value) || 0;
+    }
+    updatePreview();
+  }
+
+  document.getElementById('addVuln').addEventListener('click', () => {
+    currentTeamData.images.push({
+      name: `image-${currentTeamData.images.length + 1}`,
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0
+    });
+    renderVulnTable();
+    updatePreview();
+  });
+
+  // ========== BUG TABLE ==========
+  function renderBugTable() {
+    const tbody = document.getElementById('bugTbody');
+    tbody.innerHTML = '';
+
+    if (currentTeamData.tickets.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No bug tickets defined. Click "+ Add Ticket" to add one.</td></tr>';
+      return;
+    }
+
+    currentTeamData.tickets.forEach((ticket, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" value="${escapeHtml(ticket.name)}" data-idx="${idx}" data-field="name" /></td>
+        <td>
+          <select data-idx="${idx}" data-field="priority">
+            <option value="p0" ${ticket.priority === 'p0' ? 'selected' : ''}>P0</option>
+            <option value="p1" ${ticket.priority === 'p1' ? 'selected' : ''}>P1</option>
+            <option value="p2" ${ticket.priority === 'p2' ? 'selected' : ''}>P2</option>
+          </select>
+        </td>
+        <td><button class="btn danger" data-idx="${idx}">Remove</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('input, select').forEach(el => {
+      el.addEventListener('input', handleBugChange);
+      el.addEventListener('change', handleBugChange);
+    });
+
+    tbody.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.idx);
+        currentTeamData.tickets.splice(idx, 1);
+        renderBugTable();
+        updatePreview();
+      });
+    });
+  }
+
+  function handleBugChange(e) {
+    const idx = Number(e.target.dataset.idx);
+    const field = e.target.dataset.field;
+    currentTeamData.tickets[idx][field] = e.target.value;
+    updatePreview();
+  }
+
+  document.getElementById('addBug').addEventListener('click', () => {
+    currentTeamData.tickets.push({
+      name: `BUG-${1000 + Math.floor(Math.random() * 9000)}`,
+      priority: 'p2'
+    });
+    renderBugTable();
+    updatePreview();
+  });
+
+  // ========== POSTMORTEM TABLE ==========
+  function renderPmTable() {
+    const tbody = document.getElementById('pmTbody');
+    tbody.innerHTML = '';
+
+    if (currentTeamData.problems.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No postmortem problems defined. Click "+ Add Problem" to add one.</td></tr>';
+      return;
+    }
+
+    currentTeamData.problems.forEach((problem, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" value="${escapeHtml(problem.incident)}" style="width: 130px;" data-idx="${idx}" data-field="incident" /></td>
+        <td>
+          <select data-idx="${idx}" data-field="severity">
+            <option value="sev1" ${problem.severity === 'sev1' ? 'selected' : ''}>Sev1</option>
+            <option value="sev2" ${problem.severity === 'sev2' ? 'selected' : ''}>Sev2</option>
+            <option value="sev3" ${problem.severity === 'sev3' ? 'selected' : ''}>Sev3</option>
+            <option value="sev4" ${problem.severity === 'sev4' ? 'selected' : ''}>Sev4</option>
+          </select>
+        </td>
+        <td>
+          <select data-idx="${idx}" data-field="problemType" style="width: 130px;">
+            <option value="metadata" ${problem.problemType === 'metadata' ? 'selected' : ''}>Metadata</option>
+            <option value="actions" ${problem.problemType === 'actions' ? 'selected' : ''}>Actions</option>
+            <option value="postmortem" ${problem.problemType === 'postmortem' ? 'selected' : ''}>Postmortem</option>
+          </select>
+        </td>
+        <td><input type="text" value="${escapeHtml(problem.description)}" style="width: 250px;" data-idx="${idx}" data-field="description" /></td>
+        <td><button class="btn danger" data-idx="${idx}">Remove</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('input, select').forEach(el => {
+      el.addEventListener('input', handlePmChange);
+      el.addEventListener('change', handlePmChange);
+    });
+
+    tbody.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.idx);
+        currentTeamData.problems.splice(idx, 1);
+        renderPmTable();
+        updatePreview();
+      });
+    });
+  }
+
+  function handlePmChange(e) {
+    const idx = Number(e.target.dataset.idx);
+    const field = e.target.dataset.field;
+    currentTeamData.problems[idx][field] = e.target.value;
+    updatePreview();
+  }
+
+  document.getElementById('addPm').addEventListener('click', () => {
+    currentTeamData.problems.push({
+      incident: `ALERT-${1000 + Math.floor(Math.random() * 9000)}`,
+      severity: 'sev2',
+      problemType: 'metadata',
+      description: 'New problem'
+    });
+    renderPmTable();
+    updatePreview();
+  });
+
+  // ========== PREVIEW UPDATE ==========
+  function updatePreview() {
+    const sloResult = compute.computeSloScore(currentTeamData.slos, config.slo, normMethods);
+    const vulnResult = compute.computeVulnScore(currentTeamData.images, config.vuln, normMethods);
+    const bugResult = compute.computeBugScore(currentTeamData.tickets, config.bug, normMethods);
+    const pmResult = compute.computePmScore(currentTeamData.problems, config.pm, normMethods);
+
+    const totalScore = sloResult.score + vulnResult.score + bugResult.score + pmResult.score;
+    const totalMax = config.slo.pointBudget + config.vuln.budget + config.bug.budget + config.pm.budget;
+
+    // Helper for color class
+    const getColorClass = (score, max) => {
+      const pct = max > 0 ? score / max : 0;
+      if (pct >= 0.7) return 'good';
+      if (pct >= 0.4) return 'warn';
+      return 'bad';
+    };
+
+    // Update preview boxes
+    document.getElementById('previewSlo').textContent = Math.round(sloResult.score);
+    document.getElementById('previewSlo').className = 'preview-score ' + getColorClass(sloResult.score, config.slo.pointBudget);
+    document.getElementById('previewSloMax').textContent = config.slo.pointBudget;
+
+    document.getElementById('previewVuln').textContent = Math.round(vulnResult.score);
+    document.getElementById('previewVuln').className = 'preview-score ' + getColorClass(vulnResult.score, config.vuln.budget);
+    document.getElementById('previewVulnMax').textContent = config.vuln.budget;
+
+    document.getElementById('previewBug').textContent = Math.round(bugResult.score);
+    document.getElementById('previewBug').className = 'preview-score ' + getColorClass(bugResult.score, config.bug.budget);
+    document.getElementById('previewBugMax').textContent = config.bug.budget;
+
+    document.getElementById('previewPm').textContent = Math.round(pmResult.score);
+    document.getElementById('previewPm').className = 'preview-score ' + getColorClass(pmResult.score, config.pm.budget);
+    document.getElementById('previewPmMax').textContent = config.pm.budget;
+
+    document.getElementById('previewTotal').textContent = Math.round(totalScore);
+    document.getElementById('previewTotal').className = 'preview-score ' + getColorClass(totalScore, totalMax);
+    document.getElementById('previewTotalMax').textContent = Math.round(totalMax);
+  }
+
+  // ========== RENDER ALL ==========
+  function renderAll() {
+    renderSloTable();
+    renderVulnTable();
+    renderBugTable();
+    renderPmTable();
+  }
+
+  // ========== ACTIONS ==========
+  saveBtn.addEventListener('click', () => {
+    if (currentTeamPath) {
+      MockData.updateMockDataForTeam(currentTeamPath, currentTeamData);
+      alert('✓ Changes saved successfully!');
+    }
+  });
+
+  generateBtn.addEventListener('click', () => {
+    if (currentTeamPath && confirm('Generate random data for this team? Current data will be replaced.')) {
+      const targetScore = 60 + Math.floor(Math.random() * 30); // 60-90
+      currentTeamData = MockData.generateTeamData(targetScore);
+      renderAll();
+      updatePreview();
+    }
+  });
+
+  resetAllBtn.addEventListener('click', () => {
+    if (confirm('Reset ALL mock data for the entire organization? This cannot be undone.')) {
+      MockData.resetMockData();
+      loadTeamData();
+      alert('✓ All mock data has been reset to defaults.');
+    }
+  });
+
+  // ========== INITIALIZATION ==========
+  populateTeamSelector();
+</script>
+</body>
+</html>
