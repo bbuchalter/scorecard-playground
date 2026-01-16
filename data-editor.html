@@ -847,6 +847,31 @@
 
   // ========== INITIALIZATION ==========
   populateTeamSelector();
+  
+  // Check for team parameter in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const teamParam = urlParams.get('team');
+  
+  if (teamParam) {
+    try {
+      const teamPath = JSON.parse(decodeURIComponent(teamParam));
+      if (Array.isArray(teamPath) && teamPath.length > 0) {
+        // Find matching team in selector
+        const teams = MockData.getAllTeamPaths();
+        const teamIndex = teams.findIndex(t => 
+          JSON.stringify(t.path) === JSON.stringify(teamPath)
+        );
+        
+        if (teamIndex !== -1) {
+          teamSelectorEl.value = teamIndex.toString();
+          currentTeamPath = teams[teamIndex].path;
+          loadTeamData();
+        }
+      }
+    } catch (e) {
+      // Invalid JSON, ignore
+    }
+  }
 </script>
 </body>
 </html>

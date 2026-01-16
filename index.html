@@ -199,12 +199,13 @@
     .category-bar.warn > div { background: var(--warn); }
     .category-bar.bad > div { background: var(--bad); }
 
-    /* Dashboard link */
-    .dashboard-link {
+    /* Sidebar action links */
+    .dashboard-link,
+    .data-editor-link {
       display: block;
       text-align: center;
-      padding: 12px 16px;
-      margin-top: 16px;
+      padding: 10px 14px;
+      margin-top: 12px;
       background: rgba(147,197,253,.12);
       border: 1px solid rgba(147,197,253,.25);
       border-radius: 8px;
@@ -215,7 +216,8 @@
       transition: background .15s, border-color .15s;
     }
 
-    .dashboard-link:hover {
+    .dashboard-link:hover,
+    .data-editor-link:hover {
       background: rgba(147,197,253,.20);
       border-color: rgba(147,197,253,.40);
     }
@@ -1082,26 +1084,20 @@
         📊 See Dashboard
       </a>
 
-      <!-- Priority Work List -->
+      <!-- Top Opportunities List -->
       <div class="priority-work">
-        <h3 class="sidebar-title">Priority Work</h3>
+        <h3 class="sidebar-title">Top 5 Opportunities</h3>
         <div id="priorityItems" class="priority-items">
           <!-- Dynamically populated -->
         </div>
+        <a href="data-editor.html" class="data-editor-link" id="dataEditorLink">
+          ✏️ Data Editor
+        </a>
       </div>
     </aside>
 
     <!-- Main content -->
     <div class="wrap">
-      <!-- Top Header with Nav -->
-      <header class="top-header">
-        <h1 class="top-header-title">Scorecard Config</h1>
-        <nav class="nav-links">
-          <a href="dashboard.html" class="nav-btn">📊 Dashboard</a>
-          <a href="data-editor.html" class="nav-btn">✏️ Data Editor</a>
-        </nav>
-      </header>
-
       <!-- Welcome Introduction -->
       <div class="welcome-hero">
         <div class="welcome-hero-left">
@@ -2182,7 +2178,7 @@
     
     // Update priority work list with FLIP animation
     const opportunities = calculateOpportunities();
-    const maxToShow = 10;
+    const maxToShow = 5;
     const topOpportunities = opportunities.slice(0, maxToShow);
     
     if (topOpportunities.length === 0) {
@@ -4501,10 +4497,19 @@ ${items.map(it => `     ${it.name}: weighted=${fmt(it.weightedCount, 2)} → s =
   // Handle team selection change
   // Update dashboard link with current team path
   const dashboardLinkEl = document.getElementById('dashboardLink');
+  const dataEditorLinkEl = document.getElementById('dataEditorLink');
+  
   function updateDashboardLink() {
     if (currentTeamPath && dashboardLinkEl) {
       const teamParam = encodeURIComponent(JSON.stringify(currentTeamPath));
       dashboardLinkEl.href = `dashboard.html?team=${teamParam}`;
+    }
+  }
+  
+  function updateDataEditorLink() {
+    if (currentTeamPath && dataEditorLinkEl) {
+      const teamParam = encodeURIComponent(JSON.stringify(currentTeamPath));
+      dataEditorLinkEl.href = `data-editor.html?team=${teamParam}`;
     }
   }
 
@@ -4534,14 +4539,16 @@ ${items.map(it => `     ${it.name}: weighted=${fmt(it.weightedCount, 2)} → s =
         recomputeBug();
         recomputePm();
         
-        // Update dashboard link
+        // Update sidebar links
         updateDashboardLink();
+        updateDataEditorLink();
       }
     }
   });
   
   populateTeamSelector();
   updateDashboardLink();
+  updateDataEditorLink();
 
   // All sections initialized, enable state saving
   allSectionsInitialized = true;
