@@ -249,13 +249,64 @@
       border-radius: 8px;
       background: rgba(255,255,255,.03);
       border: 1px solid rgba(255,255,255,.08);
-      transition: all .15s;
+      transition: background .15s, border-color .15s;
+      position: relative;
     }
 
     .priority-item:hover {
       background: rgba(255,255,255,.06);
       border-color: rgba(255,255,255,.12);
-      transform: translateX(2px);
+    }
+    
+    .priority-item.flip-animating {
+      transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), 
+                  background .15s, border-color .15s;
+      z-index: 10;
+    }
+    
+    .priority-item.flip-animating::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 8px;
+      background: linear-gradient(90deg, transparent, rgba(147, 197, 253, 0.1), transparent);
+      animation: shimmer 0.5s ease-out;
+      pointer-events: none;
+    }
+    
+    @keyframes shimmer {
+      0% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    
+    .priority-item.entering {
+      animation: fadeInSlide 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    
+    .priority-item.exiting {
+      animation: fadeOutSlide 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    
+    @keyframes fadeInSlide {
+      from {
+        opacity: 0;
+        transform: translateX(-20px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+      }
+    }
+    
+    @keyframes fadeOutSlide {
+      from {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+      }
+      to {
+        opacity: 0;
+        transform: translateX(20px) scale(0.95);
+      }
     }
 
     .priority-item-header {
@@ -2143,7 +2194,7 @@
       sidebarEl.pmBar.querySelector("div").style.width = (pmPct * 100).toFixed(1) + "%";
     }
     
-    // Update priority work list
+    // Update priority work list with FLIP animation
     const opportunities = calculateOpportunities();
     const maxToShow = 10;
     const topOpportunities = opportunities.slice(0, maxToShow);
@@ -2151,8 +2202,25 @@
     if (topOpportunities.length === 0) {
       sidebarEl.priorityItems.innerHTML = '<div class="priority-empty">✓ All items at max score!</div>';
     } else {
+      // FLIP animation: First - record old positions and elements
+      const oldItems = Array.from(sidebarEl.priorityItems.querySelectorAll('.priority-item'));
+      const oldPositions = new Map();
+      const oldIds = new Set();
+      
+      oldItems.forEach(item => {
+        const id = item.dataset.itemId;
+        if (id) {
+          oldPositions.set(id, item.getBoundingClientRect());
+          oldIds.add(id);
+        }
+      });
+      
+      // Get new item IDs
+      const newIds = new Set(topOpportunities.map(opp => opp.itemId));
+      
+      // Last - update DOM
       sidebarEl.priorityItems.innerHTML = topOpportunities.map(opp => `
-        <a href="${opp.link}" class="priority-item">
+        <a href="${opp.link}" class="priority-item" data-item-id="${opp.itemId}">
           <div class="priority-item-header">
             <span class="priority-item-dot" style="background: ${opp.categoryColor};"></span>
             <span class="priority-item-category">${opp.category}</span>
@@ -2161,6 +2229,47 @@
           <div class="priority-item-name">${escapeHtml(opp.name)}</div>
         </a>
       `).join('');
+      
+      // Invert & Play - animate items that moved or are new
+      const newItems = sidebarEl.priorityItems.querySelectorAll('.priority-item');
+      
+      newItems.forEach(item => {
+        const id = item.dataset.itemId;
+        const oldPos = oldPositions.get(id);
+        
+        if (oldPos) {
+          // Item existed before - check if it moved
+          const newPos = item.getBoundingClientRect();
+          const deltaY = oldPos.top - newPos.top;
+          
+          if (Math.abs(deltaY) > 2) {
+            // FLIP: Invert - set transform to old position (without transition)
+            item.style.transform = `translateY(${deltaY}px)`;
+            
+            // Force reflow to ensure the transform is applied
+            item.offsetHeight;
+            
+            // Play - add transition class and clear transform to animate
+            item.classList.add('flip-animating');
+            item.style.transform = '';
+            
+            // Cleanup after animation
+            item.addEventListener('transitionend', function handler(e) {
+              if (e.propertyName === 'transform') {
+                item.classList.remove('flip-animating');
+                item.removeEventListener('transitionend', handler);
+              }
+            });
+          }
+        } else {
+          // New item - fade in with entrance animation
+          item.classList.add('entering');
+          item.addEventListener('animationend', function handler() {
+            item.classList.remove('entering');
+            item.removeEventListener('animationend', handler);
+          });
+        }
+      });
     }
   }
 
