@@ -1970,6 +1970,29 @@
 
   // ========== INITIALIZATION ==========
   document.addEventListener('DOMContentLoaded', () => {
+    // Check for team parameter in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const teamParam = urlParams.get('team');
+    
+    if (teamParam) {
+      try {
+        const teamPath = JSON.parse(decodeURIComponent(teamParam));
+        if (Array.isArray(teamPath) && teamPath.length > 0) {
+          // Validate the path exists in organizationData
+          let valid = true;
+          if (teamPath[0] && !organizationData[teamPath[0]]) valid = false;
+          if (valid && teamPath[1] && !organizationData[teamPath[0]]?.teams?.[teamPath[1]]) valid = false;
+          if (valid && teamPath[2] && !organizationData[teamPath[0]]?.teams?.[teamPath[1]]?.subTeams?.[teamPath[2]]) valid = false;
+          
+          if (valid) {
+            navigationPath = teamPath;
+          }
+        }
+      } catch (e) {
+        // Invalid JSON, ignore
+      }
+    }
+    
     render();
   });
 </script>

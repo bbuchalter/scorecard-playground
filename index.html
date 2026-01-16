@@ -199,6 +199,27 @@
     .category-bar.warn > div { background: var(--warn); }
     .category-bar.bad > div { background: var(--bad); }
 
+    /* Dashboard link */
+    .dashboard-link {
+      display: block;
+      text-align: center;
+      padding: 12px 16px;
+      margin-top: 16px;
+      background: rgba(147,197,253,.12);
+      border: 1px solid rgba(147,197,253,.25);
+      border-radius: 8px;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background .15s, border-color .15s;
+    }
+
+    .dashboard-link:hover {
+      background: rgba(147,197,253,.20);
+      border-color: rgba(147,197,253,.40);
+    }
+
     /* Priority work list */
     .priority-work {
       margin-top: 24px;
@@ -1056,6 +1077,11 @@
         <div class="category-bar" id="sidebarPmBar"><div></div></div>
       </a>
 
+      <!-- Dashboard Link -->
+      <a href="dashboard.html" class="dashboard-link" id="dashboardLink">
+        📊 See Dashboard
+      </a>
+
       <!-- Priority Work List -->
       <div class="priority-work">
         <h3 class="sidebar-title">Priority Work</h3>
@@ -1079,7 +1105,7 @@
       <!-- Welcome Introduction -->
       <div class="welcome-hero">
         <div class="welcome-hero-left">
-          <h1 class="welcome-title">Design your company's health scorecard</h1>
+          <h1 class="welcome-title">Design your company's scorecards</h1>
           <p class="welcome-desc">
             This configuration playground lets you design a single scoring model that applies to all teams across your organization. 
             Select any team from the sidebar to simulate how your configuration affects their scores in real-time.
@@ -4473,6 +4499,15 @@ ${items.map(it => `     ${it.name}: weighted=${fmt(it.weightedCount, 2)} → s =
   }
   
   // Handle team selection change
+  // Update dashboard link with current team path
+  const dashboardLinkEl = document.getElementById('dashboardLink');
+  function updateDashboardLink() {
+    if (currentTeamPath && dashboardLinkEl) {
+      const teamParam = encodeURIComponent(JSON.stringify(currentTeamPath));
+      dashboardLinkEl.href = `dashboard.html?team=${teamParam}`;
+    }
+  }
+
   teamSelectorEl.addEventListener('change', () => {
     const idx = Number(teamSelectorEl.value);
     const teams = window.MockData.getAllTeamPaths();
@@ -4498,11 +4533,15 @@ ${items.map(it => `     ${it.name}: weighted=${fmt(it.weightedCount, 2)} → s =
         recomputeVuln();
         recomputeBug();
         recomputePm();
+        
+        // Update dashboard link
+        updateDashboardLink();
       }
     }
   });
   
   populateTeamSelector();
+  updateDashboardLink();
 
   // All sections initialized, enable state saving
   allSectionsInitialized = true;
