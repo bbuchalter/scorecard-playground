@@ -2397,15 +2397,21 @@
   function renderSloChart() {
     const showAll = el.showAllMethods.checked;
     const currentMethod = state.method;
-    const maxCount = 25;
     
-    const labels = Array.from({ length: maxCount + 1 }, (_, i) => i);
+    // Generate labels from +100 to -100 (left to right)
+    const labels = Array.from({ length: 201 }, (_, i) => 100 - i);
     const datasets = [];
+    
+    // Calculate score based on EB%: positive = 1.0, negative = apply penalty
+    const calcScore = (ebPct, methodInfo, params) => {
+      if (ebPct >= 0) return 1.0;
+      return methodInfo.calc(Math.abs(ebPct), params);
+    };
     
     if (showAll) {
       Object.entries(normMethods).forEach(([key, methodInfo]) => {
         const params = state.params[key];
-        const data = labels.map(count => methodInfo.calc(count, params));
+        const data = labels.map(ebPct => calcScore(ebPct, methodInfo, params));
         const isSelected = key === currentMethod;
         
         datasets.push({
@@ -2424,7 +2430,7 @@
     } else {
       const params = state.params[currentMethod];
       const methodInfo = normMethods[currentMethod];
-      const data = labels.map(count => methodInfo.calc(count, params));
+      const data = labels.map(ebPct => calcScore(ebPct, methodInfo, params));
       
       datasets.push({
         label: methodInfo.name,
@@ -2474,7 +2480,7 @@
               borderWidth: 1,
               padding: 10,
               callbacks: {
-                title: (items) => `Negative EB%: ${items[0].label}`,
+                title: (items) => `Error Budget: ${items[0].label}%`,
                 label: (item) => `${item.dataset.label}: ${item.parsed.y.toFixed(4)}`
               }
             }
@@ -2483,11 +2489,22 @@
             x: {
               title: {
                 display: true,
-                text: "Negative Error Budget %",
+                text: "Error Budget %",
                 color: "#a9b4d6",
                 font: { size: 11 }
               },
-              ticks: { color: "#a9b4d6", font: { size: 10 } },
+              ticks: { 
+                color: "#a9b4d6", 
+                font: { size: 10 },
+                autoSkip: false,
+                callback: function(value, index) {
+                  const label = 100 - index; // labels go from 100 to -100
+                  // Show ticks at intervals of 20
+                  if (label % 20 === 0) return label + '%';
+                  return null;
+                },
+                maxRotation: 0
+              },
               grid: { color: "rgba(255,255,255,0.06)" }
             },
             y: {
