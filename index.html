@@ -963,18 +963,24 @@
         100% means you haven't used any budget (perfect reliability). 
         0% means you've exhausted your budget (too many failures).
       </p>
+      <p>
+        <strong>Negative error budgets</strong> occur when you've exceeded your error budget—you've had more 
+        failures than your SLO allows. For example, if your 99.9% availability target allows 43 minutes of 
+        downtime per month, but you've had 60 minutes, your EB% would be approximately -40%. 
+        Negative values indicate you're "in the red" and need to prioritize reliability improvements.
+      </p>
       
       <h4>Key design decisions</h4>
       <ul>
         <li>
           <strong>Normalization is straightforward.</strong>
           Since EB% is already a percentage (0–100), we simply divide by 100 to get a 0–1 score. 
-          No complex normalization needed.
+          Negative values are clamped to 0 (no credit for being in debt).
         </li>
         <li>
           <strong>Weight by tier.</strong>
           SLOs are assigned tiers (p0, p1, p2) reflecting their importance. 
-          A p0 (critical) SLO with low error budget remaining drags the score down more than a p2.
+          A p0 (critical) SLO with low or negative error budget remaining drags the score down more than a p2.
         </li>
         <li>
           <strong>Weighted average.</strong>
@@ -984,7 +990,7 @@
       </ul>
       
       <p class="muted" style="margin-bottom: 0;">
-        Adjust tier weights and SLO inputs below to see how they affect the final score.
+        Adjust tier weights and SLO inputs below to see how they affect the final score. Try negative EB% values to simulate exhausted budgets.
       </p>
     </div>
 
@@ -1247,29 +1253,34 @@
     <div class="intro-box">
       <h3>Score design</h3>
       <p>
-        Bug reports are categorized by priority: <strong>P0</strong> (critical/outage), <strong>P1</strong> (high impact), 
-        and <strong>P2</strong> (moderate). Like container vulnerabilities, bug counts are unbounded numbers 
+        Bug reports are tracked as individual tickets, each assigned a priority level: <strong>P0</strong> (critical/outage), 
+        <strong>P1</strong> (high impact), or <strong>P2</strong> (moderate). Bug counts are unbounded numbers 
         that need to be <em>normalized</em> into a 0–1 score.
       </p>
       
       <h4>Key design decisions</h4>
       <ul>
         <li>
-          <strong>Simple totals.</strong> 
-          We count total bugs per priority level across the entire service. 
-          No need to break down by product or component.
+          <strong>Individual ticket tracking.</strong> 
+          Enter each bug ticket with its assigned priority. The system aggregates 
+          counts by priority level for scoring.
         </li>
         <li>
           <strong>Weight by priority.</strong>
           P0 bugs are weighted most heavily (default: P0=4, P1=2, P2=1).
           A single P0 outage bug should hurt more than several P2 polish issues.
         </li>
+        <li>
+          <strong>Choose a normalization method.</strong>
+          Different methods have different characteristics—exponential decay is smooth, 
+          linear threshold has a hard cutoff, etc. The right choice depends on how you want to model urgency.
+        </li>
       </ul>
 
       <h4>Recommendation: Exponential decay (λ = 0.85)</h4>
       <p>
-        Following the same rationale as container vulnerabilities, we recommend <strong>exponential decay</strong> 
-        with a decay rate of <strong>0.85</strong>. Each additional bug reduces the score by 15%.
+        We recommend <strong>exponential decay</strong> with a decay rate of <strong>0.85</strong>. 
+        Each additional bug reduces the score by 15%. Other methods are available for different team needs.
       </p>
       <p class="muted" style="margin-bottom: 0;">
         With λ = 0.85: 0 bugs → 1.00, 1 → 0.85, 3 → 0.61, 5 → 0.44, 10 → 0.20
@@ -1295,38 +1306,54 @@
           <input type="number" id="bugBudget" min="1" step="1" value="20" style="width:70px">
         </div>
 
-        <div class="config-group">
-          <span class="config-label">Decay rate (λ)</span>
-          <div class="row">
-            <input type="number" id="bugDecay" step="0.05" min="0.1" max="0.99" value="0.85" style="width:70px">
-            <span class="muted" style="font-size: 12px;">Each bug multiplies score by this value</span>
-          </div>
+        <div class="config-group" style="margin-top: 14px;">
+          <div class="config-label">Normalization method</div>
+          <select id="bugMethod" style="width: 100%; max-width: 300px;">
+            <option value="exponential">Exponential decay</option>
+            <option value="linear">Linear threshold</option>
+            <option value="inverse">Inverse (hyperbolic)</option>
+            <option value="logarithmic">Logarithmic</option>
+            <option value="sigmoid">Sigmoid (S-curve)</option>
+            <option value="bucket">Bucket / Step function</option>
+          </select>
         </div>
 
-        <!-- Chart -->
+        <div class="method-params" id="bugMethodParams">
+          <!-- Dynamically populated based on selected method -->
+        </div>
+
         <div class="chart-container" style="margin-top: 14px;">
-          <canvas id="bugChart" height="140"></canvas>
+          <div class="config-label" style="margin-bottom: 8px;">Normalization curve</div>
+          <div style="position: relative; height: 200px;">
+            <canvas id="bugChart"></canvas>
+          </div>
+          <div class="row" style="margin-top: 8px; gap: 8px;">
+            <label style="font-size: 12px;">
+              <input type="checkbox" id="bugShowAllMethods" />
+              Show all methods
+            </label>
+          </div>
         </div>
       </div>
 
       <!-- Inputs -->
       <div class="card">
         <h2>Inputs</h2>
-        <p class="muted" style="font-size: 12px; margin: 0 0 10px;">Enter the total count of open bugs by priority.</p>
-        
-        <div class="row" style="gap: 16px;">
-          <label style="flex-direction: column; align-items: flex-start; gap: 4px;">
-            <span>P0 bugs</span>
-            <input type="number" id="bugCountP0" min="0" step="1" value="1" style="width: 80px;">
-          </label>
-          <label style="flex-direction: column; align-items: flex-start; gap: 4px;">
-            <span>P1 bugs</span>
-            <input type="number" id="bugCountP1" min="0" step="1" value="3" style="width: 80px;">
-          </label>
-          <label style="flex-direction: column; align-items: flex-start; gap: 4px;">
-            <span>P2 bugs</span>
-            <input type="number" id="bugCountP2" min="0" step="1" value="8" style="width: 80px;">
-          </label>
+        <p class="muted" style="font-size: 12px; margin: 0 0 10px;">Enter individual bug tickets with their priority assignment.</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Ticket</th>
+              <th>Priority</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="bugTbody"></tbody>
+        </table>
+
+        <div class="row" style="justify-content: flex-end; margin-top: 12px;">
+          <button class="btn" id="addBug">+ Add Ticket</button>
         </div>
       </div>
 
@@ -1368,25 +1395,25 @@
       <p>
         Postmortem quality is measured across three problem types: <strong>Incomplete postmortem</strong> (most critical), 
         <strong>Incomplete action items</strong>, and <strong>Missing metadata</strong> (least critical). 
-        Unlike per-incident tracking, this score answers: <em>"How is this team doing on postmortem hygiene overall?"</em>
+        Each problem is entered individually with its incident, severity, type, and description.
       </p>
       
       <h4>Key design decisions</h4>
       <ul>
         <li>
-          <strong>Input per-incident, score globally.</strong> 
-          You enter problems for each incident (natural for users), but we aggregate across all incidents 
-          to measure team-wide hygiene. This treats postmortem problems as a backlog to burn down.
+          <strong>Individual problem tracking.</strong> 
+          Enter each problem separately with its associated incident and severity. 
+          Problems are aggregated by type to measure team-wide hygiene.
         </li>
         <li>
           <strong>Weight by both severity and problem type.</strong>
           A Sev1 incomplete postmortem is more urgent than a Sev4 missing metadata. 
-          We use multiplicative weighting: weighted_count = Σ(severity_weight × problem_count).
+          We use multiplicative weighting: weighted_count = Σ(severity_weight × 1).
         </li>
         <li>
-          <strong>Exponential decay normalization.</strong>
-          Each weighted problem unit reduces the type score by 15% (λ = 0.85). 
-          This means: 0 problems → 1.0, but accumulating problems exponentially hurts the score.
+          <strong>Choose a normalization method.</strong>
+          Different methods have different characteristics—exponential decay is smooth, 
+          linear threshold has a hard cutoff, etc. The right choice depends on how you want to model urgency.
         </li>
         <li>
           <strong>Weighted average across types.</strong>
@@ -1397,12 +1424,12 @@
       
       <h4>Example calculation</h4>
       <p class="muted" style="margin-bottom: 0;">
-        <strong>Incident 1 (Sev1):</strong> 1 incomplete action item → contributes 4 to actions total<br>
-        <strong>Incident 2 (Sev3):</strong> 2 metadata, 1 postmortem → contributes 2 to metadata, 1 to postmortem<br>
-        <strong>Incident 3 (Sev2):</strong> 1 metadata, 1 action → contributes 2 to metadata, 2 to actions<br><br>
-        Weighted totals: metadata=4, actions=6, postmortem=1<br>
-        Type scores (λ=0.85): metadata=0.52, actions=0.38, postmortem=0.85<br>
-        Final S = (1×0.52 + 2×0.38 + 3×0.85) / (1+2+3) = 0.64
+        <strong>Problem 1:</strong> ALERT-4721 (Sev1), incomplete actions → contributes 4 to actions<br>
+        <strong>Problem 2:</strong> ALERT-3892 (Sev2), missing metadata → contributes 2 to metadata<br>
+        <strong>Problem 3:</strong> ALERT-1547 (Sev3), incomplete postmortem → contributes 1 to postmortem<br><br>
+        Weighted totals: metadata=2, actions=4, postmortem=1<br>
+        Type scores (λ=0.85): metadata=0.72, actions=0.52, postmortem=0.85<br>
+        Final S = (1×0.72 + 2×0.52 + 3×0.85) / (1+2+3) = 0.72
       </p>
     </div>
 
@@ -1436,10 +1463,31 @@
         </div>
 
         <div class="config-group" style="margin-top: 14px;">
-          <span class="config-label">Decay rate (λ)</span>
-          <div class="row">
-            <input type="number" id="pmDecay" step="0.05" min="0.1" max="0.99" value="0.85" style="width:70px">
-            <span class="muted" style="font-size: 12px;">Each weighted problem unit multiplies score by this</span>
+          <div class="config-label">Normalization method</div>
+          <select id="pmMethod" style="width: 100%; max-width: 300px;">
+            <option value="exponential">Exponential decay</option>
+            <option value="linear">Linear threshold</option>
+            <option value="inverse">Inverse (hyperbolic)</option>
+            <option value="logarithmic">Logarithmic</option>
+            <option value="sigmoid">Sigmoid (S-curve)</option>
+            <option value="bucket">Bucket / Step function</option>
+          </select>
+        </div>
+
+        <div class="method-params" id="pmMethodParams">
+          <!-- Dynamically populated based on selected method -->
+        </div>
+
+        <div class="chart-container" style="margin-top: 14px;">
+          <div class="config-label" style="margin-bottom: 8px;">Normalization curve</div>
+          <div style="position: relative; height: 200px;">
+            <canvas id="pmChart"></canvas>
+          </div>
+          <div class="row" style="margin-top: 8px; gap: 8px;">
+            <label style="font-size: 12px;">
+              <input type="checkbox" id="pmShowAllMethods" />
+              Show all methods
+            </label>
           </div>
         </div>
       </div>
@@ -1447,16 +1495,15 @@
       <!-- Inputs -->
       <div class="card">
         <h2>Inputs</h2>
-        <p class="muted" style="font-size: 12px; margin: 0 0 10px;">Enter incidents with their problem counts. Scoring aggregates across all incidents.</p>
+        <p class="muted" style="font-size: 12px; margin: 0 0 10px;">Enter individual postmortem problems. Scoring aggregates by problem type across all incidents.</p>
 
         <table>
           <thead>
             <tr>
               <th>Incident</th>
               <th>Severity</th>
-              <th>Missing<br>metadata</th>
-              <th>Incomplete<br>actions</th>
-              <th>Incomplete<br>postmortem</th>
+              <th>Problem Type</th>
+              <th>Description</th>
               <th></th>
             </tr>
           </thead>
@@ -1464,7 +1511,7 @@
         </table>
 
         <div class="row" style="justify-content: flex-end; margin-top: 12px;">
-          <button class="btn" id="addPm">+ Add Incident</button>
+          <button class="btn" id="addPm">+ Add Problem</button>
         </div>
       </div>
 
@@ -1508,8 +1555,10 @@
 
   // ---------- LocalStorage Persistence ----------
   const STORAGE_KEY = "scorecard-playground-state";
+  let allSectionsInitialized = false;
 
   function saveAllState() {
+    if (!allSectionsInitialized) return; // Skip saving during initial load
     try {
       const allState = {
         slo: state,
@@ -1542,7 +1591,9 @@
     slos: [
       { name: "Checkout latency", ebPct: 60, tier: "p1" },
       { name: "API availability", ebPct: 80, tier: "p0" },
-      { name: "Job success rate", ebPct: 90, tier: "p2" }
+      { name: "Job success rate", ebPct: 90, tier: "p2" },
+      { name: "Payment gateway uptime", ebPct: -15, tier: "p0" },
+      { name: "Search response time", ebPct: -40, tier: "p1" }
     ]
   });
 
@@ -1722,7 +1773,7 @@
       const tdEb = document.createElement("td");
       const eb = document.createElement("input");
       eb.type = "number";
-      eb.min = "0";
+      eb.min = "-100";
       eb.max = "100";
       eb.step = "1";
       eb.value = slo.ebPct;
@@ -1874,8 +1925,6 @@ CALCULATION
     score = budget × S
     score = ${pointBudget} × ${fmt(S,4)} = ${fmt2(points)}
 `;
-
-    renderTable();
     
     // Update sidebar
     currentScores.slo = points;
@@ -2600,11 +2649,56 @@ CALCULATION
   const defaultBugState = () => ({
     budget: 20,
     weights: { p0: 4.0, p1: 2.0, p2: 1.0 },
-    decay: 0.85,
-    counts: { p0: 0, p1: 0, p2: 8 }
+    method: "exponential",
+    params: {
+      exponential: { decay: 0.85 },
+      linear: { threshold: 10 },
+      inverse: { k: 1.0 },
+      logarithmic: { maxExpected: 20 },
+      sigmoid: { midpoint: 5, steepness: 1.0 },
+      bucket: { buckets: [[0, 1.0], [1, 0.8], [3, 0.5], [6, 0.2], [11, 0.0]] }
+    },
+    tickets: [
+      { name: "BUG-1234", priority: "p0" },
+      { name: "BUG-2345", priority: "p1" },
+      { name: "BUG-3456", priority: "p1" },
+      { name: "BUG-4567", priority: "p1" },
+      { name: "BUG-5678", priority: "p2" },
+      { name: "BUG-6789", priority: "p2" },
+      { name: "BUG-7890", priority: "p2" },
+      { name: "BUG-8901", priority: "p2" },
+      { name: "BUG-9012", priority: "p2" },
+      { name: "BUG-0123", priority: "p2" },
+      { name: "BUG-1357", priority: "p2" },
+      { name: "BUG-2468", priority: "p2" }
+    ]
   });
 
   let bugState = savedState?.bug || defaultBugState();
+  
+  // Migration: convert old counts format to tickets format
+  if (bugState.counts && !bugState.tickets) {
+    bugState.tickets = [];
+    const priorities = ["p0", "p1", "p2"];
+    priorities.forEach(prio => {
+      const count = bugState.counts[prio] || 0;
+      for (let i = 0; i < count; i++) {
+        bugState.tickets.push({ 
+          name: `BUG-${prio.toUpperCase()}-${i + 1}`, 
+          priority: prio 
+        });
+      }
+    });
+    delete bugState.counts;
+  }
+  
+  // Migration: convert old decay format to method/params format
+  if (bugState.decay && !bugState.method) {
+    bugState.method = "exponential";
+    bugState.params = defaultBugState().params;
+    bugState.params.exponential.decay = bugState.decay;
+    delete bugState.decay;
+  }
 
   // ---------- Bug DOM ----------
   const bugEl = {
@@ -2612,11 +2706,12 @@ CALCULATION
     wP1: document.getElementById("bugWP1"),
     wP2: document.getElementById("bugWP2"),
     budget: document.getElementById("bugBudget"),
-    decay: document.getElementById("bugDecay"),
+    method: document.getElementById("bugMethod"),
+    methodParams: document.getElementById("bugMethodParams"),
     chartCanvas: document.getElementById("bugChart"),
-    countP0: document.getElementById("bugCountP0"),
-    countP1: document.getElementById("bugCountP1"),
-    countP2: document.getElementById("bugCountP2"),
+    showAllMethods: document.getElementById("bugShowAllMethods"),
+    tbody: document.getElementById("bugTbody"),
+    addBtn: document.getElementById("addBug"),
     scoreS: document.getElementById("bugScoreS"),
     scoreBar: document.getElementById("bugScoreBar"),
     score: document.getElementById("bugScore"),
@@ -2626,18 +2721,26 @@ CALCULATION
     formulaBox: document.getElementById("bugFormulaBox"),
   };
 
-  // Chart instance
+  // Bug chart instance
   let bugChart = null;
 
   // ---------- Compute Bug Score ----------
-  function computeBugScore() {
+  function computeBugScore(method, params) {
     const priorities = ["p0", "p1", "p2"];
-    const decay = bugState.decay;
+    const calcFn = normMethods[method].calc;
+    
+    // Count tickets by priority
+    const counts = { p0: 0, p1: 0, p2: 0 };
+    bugState.tickets.forEach(ticket => {
+      if (counts.hasOwnProperty(ticket.priority)) {
+        counts[ticket.priority]++;
+      }
+    });
     
     const items = priorities.map(prio => {
-      const count = bugState.counts[prio] || 0;
+      const count = counts[prio];
       const w = bugState.weights[prio] || 1;
-      const s = Math.pow(decay, count);
+      const s = calcFn(count, params);
       return { name: prio.toUpperCase(), prio, count, w, s, ws: w * s };
     });
     
@@ -2645,22 +2748,23 @@ CALCULATION
     const numer = items.reduce((sum, it) => sum + it.ws, 0);
     const S = denom > 0 ? numer / denom : 1;
     
-    return { items, denom, numer, S };
+    return { items, denom, numer, S, counts };
   }
 
   function recomputeBug() {
-    // Sync state from inputs
+    // Sync config state from inputs
     bugState.weights.p0 = Number(bugEl.wP0.value) || 4;
     bugState.weights.p1 = Number(bugEl.wP1.value) || 2;
     bugState.weights.p2 = Number(bugEl.wP2.value) || 1;
     bugState.budget = Number(bugEl.budget.value) || 20;
-    bugState.decay = Number(bugEl.decay.value) || 0.85;
-    bugState.counts.p0 = Number(bugEl.countP0.value) || 0;
-    bugState.counts.p1 = Number(bugEl.countP1.value) || 0;
-    bugState.counts.p2 = Number(bugEl.countP2.value) || 0;
+    bugState.method = bugEl.method.value;
     
-    const { items, denom, numer, S } = computeBugScore();
+    const method = bugState.method;
+    const params = bugState.params[method];
+    
+    const { items, denom, numer, S, counts } = computeBugScore(method, params);
     const score = bugState.budget * clamp(S, 0, 1);
+    const totalTickets = bugState.tickets.length;
     
     // Update KPIs
     bugEl.scoreS.textContent = fmt(S, 4);
@@ -2675,7 +2779,7 @@ CALCULATION
     else if (S >= 0.5) note = "Fair – bugs accumulating";
     else if (S >= 0.3) note = "Poor – significant bug backlog";
     else note = "Critical – overwhelming bug count";
-    bugEl.scoreNote.textContent = note;
+    bugEl.scoreNote.textContent = `${totalTickets} ticket(s): ${note}`;
     
     // Render aggregate table
     renderBugAggTable(items, denom, numer, S);
@@ -2747,22 +2851,30 @@ CALCULATION
   }
 
   function renderBugFormula(items, denom, numer, S, score) {
+    const method = bugState.method;
+    const params = bugState.params[method];
+    const methodInfo = normMethods[method];
     const weightsDesc = `P0=${bugState.weights.p0}, P1=${bugState.weights.p1}, P2=${bugState.weights.p2}`;
     const countsDesc = items.map(it => `${it.name}: ${it.count}`).join(", ");
+    const ticketList = bugState.tickets.map(t => `    ${t.name} (${t.priority.toUpperCase()})`).join("\n") || "    (no tickets)";
     
     bugEl.formulaBox.textContent =
 `DEFINITIONS
   wᵢ    = weight for priority level (${weightsDesc})
-  sᵢ    = normalized score = λ^count where λ = ${bugState.decay}
+  sᵢ    = normalized score using ${methodInfo.name}
+  Formula: ${methodInfo.formula(params)}
   S     = weighted average of all sᵢ values (0–1)
   Score = final scorecard value (budget × S)
 
-CURRENT DATA
-  Bug counts: ${countsDesc}
+CURRENT TICKETS (${bugState.tickets.length} total)
+${ticketList}
+
+AGGREGATED COUNTS
+  ${countsDesc}
 
 CALCULATION
-  For each priority: sᵢ = ${bugState.decay}^count
-${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.s, 4)}`).join("\n")}
+  For each priority:
+${items.map(it => `    ${it.name}: count=${it.count} → s = ${fmt(it.s, 4)}`).join("\n")}
 
   Weighted average:
     S = Σ(wᵢ × sᵢ) / Σ(wᵢ)
@@ -2774,62 +2886,270 @@ ${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.
   }
 
   function renderBugChart() {
-    const ctx = bugEl.chartCanvas.getContext("2d");
-    const decay = bugState.decay;
-    
-    // Generate data points
+    const showAll = bugEl.showAllMethods.checked;
+    const currentMethod = bugState.method;
     const maxCount = 25;
+    
     const labels = Array.from({ length: maxCount + 1 }, (_, i) => i);
-    const data = labels.map(n => Math.pow(decay, n));
+    const datasets = [];
+    
+    if (showAll) {
+      Object.entries(normMethods).forEach(([key, methodInfo]) => {
+        const params = bugState.params[key];
+        const data = labels.map(count => methodInfo.calc(count, params));
+        const isSelected = key === currentMethod;
+        
+        datasets.push({
+          label: methodInfo.name,
+          data: data,
+          borderColor: methodColors[key].border,
+          backgroundColor: isSelected ? methodColors[key].bg : "transparent",
+          borderWidth: isSelected ? 3 : 1.5,
+          pointRadius: 0,
+          tension: key === "bucket" ? 0 : 0.3,
+          stepped: key === "bucket" ? "before" : false,
+          fill: isSelected,
+          order: isSelected ? 0 : 1
+        });
+      });
+    } else {
+      const params = bugState.params[currentMethod];
+      const methodInfo = normMethods[currentMethod];
+      const data = labels.map(count => methodInfo.calc(count, params));
+      
+      datasets.push({
+        label: methodInfo.name,
+        data: data,
+        borderColor: methodColors[currentMethod].border,
+        backgroundColor: methodColors[currentMethod].bg,
+        borderWidth: 3,
+        pointRadius: 0,
+        tension: currentMethod === "bucket" ? 0 : 0.3,
+        stepped: currentMethod === "bucket" ? "before" : false,
+        fill: true
+      });
+    }
     
     if (bugChart) {
       bugChart.data.labels = labels;
-      bugChart.data.datasets[0].data = data;
-      bugChart.data.datasets[0].label = `λ = ${decay}`;
+      bugChart.data.datasets = datasets;
+      bugChart.options.plugins.legend.display = showAll;
       bugChart.update("none");
-      return;
-    }
-    
-    bugChart = new Chart(ctx, {
-      type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label: `λ = ${decay}`,
-          data,
-          borderColor: "#93c5fd",
-          backgroundColor: "rgba(147,197,253,0.1)",
-          fill: true,
-          tension: 0.3,
-          pointRadius: 0,
-          borderWidth: 2
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: true,
-            position: "top",
-            labels: { color: "#a9b4d6", font: { size: 11 } }
-          }
-        },
-        scales: {
-          x: {
-            title: { display: true, text: "Bug count", color: "#a9b4d6" },
-            ticks: { color: "#a9b4d6" },
-            grid: { color: "rgba(255,255,255,0.06)" }
+    } else {
+      bugChart = new Chart(bugEl.chartCanvas, {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: "index" },
+          plugins: {
+            legend: {
+              display: showAll,
+              position: "bottom",
+              labels: { color: "#a9b4d6", font: { size: 11 }, boxWidth: 12, padding: 8 }
+            }
           },
-          y: {
-            min: 0,
-            max: 1,
-            title: { display: true, text: "Score (sᵢ)", color: "#a9b4d6" },
-            ticks: { color: "#a9b4d6" },
-            grid: { color: "rgba(255,255,255,0.06)" }
+          scales: {
+            x: {
+              title: { display: true, text: "Bug Count", color: "#a9b4d6", font: { size: 11 } },
+              ticks: { color: "#a9b4d6", font: { size: 10 } },
+              grid: { color: "rgba(255,255,255,0.06)" }
+            },
+            y: {
+              min: 0,
+              max: 1,
+              title: { display: true, text: "Normalized Score (sᵢ)", color: "#a9b4d6", font: { size: 11 } },
+              ticks: { color: "#a9b4d6", font: { size: 10 } },
+              grid: { color: "rgba(255,255,255,0.06)" }
+            }
           }
         }
-      }
+      });
+    }
+  }
+
+  // ---------- Render Bug Method Params ----------
+  function renderBugMethodParams() {
+    const method = bugState.method;
+    const params = bugState.params[method];
+    const methodInfo = normMethods[method];
+    
+    let html = "";
+    
+    if (method === "exponential") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Decay rate:</span>
+          <input type="number" id="bugParamDecay" step="0.05" min="0.1" max="0.99" value="${params.decay}" style="width: 80px;" />
+          <span class="muted small">Each bug multiplies score by this</span>
+        </div>
+      `;
+    } else if (method === "linear") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Threshold:</span>
+          <input type="number" id="bugParamThreshold" step="1" min="1" value="${params.threshold}" style="width: 80px;" />
+          <span class="muted small">Count at which score = 0</span>
+        </div>
+      `;
+    } else if (method === "inverse") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Steepness (k):</span>
+          <input type="number" id="bugParamK" step="0.1" min="0.1" value="${params.k}" style="width: 80px;" />
+          <span class="muted small">Higher = faster drop</span>
+        </div>
+      `;
+    } else if (method === "logarithmic") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Max expected:</span>
+          <input type="number" id="bugParamMax" step="1" min="1" value="${params.maxExpected}" style="width: 80px;" />
+          <span class="muted small">Count at which score = 0</span>
+        </div>
+      `;
+    } else if (method === "sigmoid") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Midpoint:</span>
+          <input type="number" id="bugParamMidpoint" step="1" min="1" value="${params.midpoint}" style="width: 80px;" />
+          <span class="muted small">Count where score = 0.5</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">Steepness:</span>
+          <input type="number" id="bugParamSteepness" step="0.1" min="0.1" value="${params.steepness}" style="width: 80px;" />
+          <span class="muted small">Higher = sharper transition</span>
+        </div>
+      `;
+    } else if (method === "bucket") {
+      html = `
+        <div class="param-row">
+          <span class="muted small">Bucket definitions (count threshold → score):</span>
+        </div>
+        <div class="param-row" style="flex-wrap: wrap; gap: 6px;">
+          ${params.buckets.map(([t, s]) => `
+            <span class="mono" style="background: rgba(255,255,255,.1); padding: 4px 8px; border-radius: 6px;">
+              ${t}+ → ${fmt2(s)}
+            </span>
+          `).join("")}
+        </div>
+      `;
+    }
+    
+    html += `
+      <div class="formula-display" id="bugParamFormula">Formula: ${methodInfo.formula(params)}</div>
+      <div class="example-display" id="bugParamExample">Example: ${methodInfo.examples(params)}</div>
+    `;
+    
+    bugEl.methodParams.innerHTML = html;
+    attachBugParamListeners();
+  }
+
+  function updateBugFormulaDisplay() {
+    const method = bugState.method;
+    const params = bugState.params[method];
+    const methodInfo = normMethods[method];
+    
+    const formulaEl = document.getElementById("bugParamFormula");
+    const exampleEl = document.getElementById("bugParamExample");
+    
+    if (formulaEl) formulaEl.textContent = `Formula: ${methodInfo.formula(params)}`;
+    if (exampleEl) exampleEl.textContent = `Example: ${methodInfo.examples(params)}`;
+  }
+
+  function attachBugParamListeners() {
+    const method = bugState.method;
+    
+    if (method === "exponential") {
+      const inp = document.getElementById("bugParamDecay");
+      if (inp) inp.addEventListener("input", () => {
+        bugState.params.exponential.decay = Number(inp.value) || 0.85;
+        updateBugFormulaDisplay();
+        recomputeBug();
+      });
+    } else if (method === "linear") {
+      const inp = document.getElementById("bugParamThreshold");
+      if (inp) inp.addEventListener("input", () => {
+        bugState.params.linear.threshold = Number(inp.value) || 10;
+        updateBugFormulaDisplay();
+        recomputeBug();
+      });
+    } else if (method === "inverse") {
+      const inp = document.getElementById("bugParamK");
+      if (inp) inp.addEventListener("input", () => {
+        bugState.params.inverse.k = Number(inp.value) || 1;
+        updateBugFormulaDisplay();
+        recomputeBug();
+      });
+    } else if (method === "logarithmic") {
+      const inp = document.getElementById("bugParamMax");
+      if (inp) inp.addEventListener("input", () => {
+        bugState.params.logarithmic.maxExpected = Number(inp.value) || 20;
+        updateBugFormulaDisplay();
+        recomputeBug();
+      });
+    } else if (method === "sigmoid") {
+      const mid = document.getElementById("bugParamMidpoint");
+      const steep = document.getElementById("bugParamSteepness");
+      if (mid) mid.addEventListener("input", () => {
+        bugState.params.sigmoid.midpoint = Number(mid.value) || 5;
+        updateBugFormulaDisplay();
+        recomputeBug();
+      });
+      if (steep) steep.addEventListener("input", () => {
+        bugState.params.sigmoid.steepness = Number(steep.value) || 1;
+        updateBugFormulaDisplay();
+        recomputeBug();
+      });
+    }
+  }
+
+  // ---------- Render Bug Table ----------
+  function renderBugTable() {
+    bugEl.tbody.innerHTML = "";
+    
+    bugState.tickets.forEach((ticket, idx) => {
+      const tr = document.createElement("tr");
+      
+      tr.innerHTML = `
+        <td><input type="text" value="${escapeHtml(ticket.name)}" style="width: 140px;" data-idx="${idx}" data-field="name" /></td>
+        <td>
+          <select data-idx="${idx}" data-field="priority" style="width: 70px;">
+            <option value="p0" ${ticket.priority === "p0" ? "selected" : ""}>P0</option>
+            <option value="p1" ${ticket.priority === "p1" ? "selected" : ""}>P1</option>
+            <option value="p2" ${ticket.priority === "p2" ? "selected" : ""}>P2</option>
+          </select>
+        </td>
+        <td><button class="btn danger" data-idx="${idx}">Remove</button></td>
+      `;
+      
+      bugEl.tbody.appendChild(tr);
+    });
+    
+    // Add event listeners
+    bugEl.tbody.querySelectorAll("input, select").forEach(inp => {
+      inp.addEventListener("input", () => {
+        const idx = Number(inp.dataset.idx);
+        const field = inp.dataset.field;
+        bugState.tickets[idx][field] = inp.value;
+        recomputeBug();
+      });
+      inp.addEventListener("change", () => {
+        const idx = Number(inp.dataset.idx);
+        const field = inp.dataset.field;
+        bugState.tickets[idx][field] = inp.value;
+        recomputeBug();
+      });
+    });
+    
+    bugEl.tbody.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.dataset.idx);
+        bugState.tickets.splice(idx, 1);
+        renderBugTable();
+        recomputeBug();
+      });
     });
   }
 
@@ -2838,24 +3158,58 @@ ${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.
   bugEl.wP1.addEventListener("input", recomputeBug);
   bugEl.wP2.addEventListener("input", recomputeBug);
   bugEl.budget.addEventListener("input", recomputeBug);
-  bugEl.decay.addEventListener("input", recomputeBug);
-  bugEl.countP0.addEventListener("input", recomputeBug);
-  bugEl.countP1.addEventListener("input", recomputeBug);
-  bugEl.countP2.addEventListener("input", recomputeBug);
+  bugEl.method.addEventListener("change", () => {
+    bugState.method = bugEl.method.value;
+    renderBugMethodParams();
+    recomputeBug();
+  });
+  bugEl.showAllMethods.addEventListener("change", renderBugChart);
+
+  const ticketNameInventory = [
+    "BUG-1234", "BUG-2345", "BUG-3456", "BUG-4567", "BUG-5678",
+    "BUG-6789", "BUG-7890", "BUG-8901", "BUG-9012", "BUG-0123",
+    "BUG-1357", "BUG-2468", "BUG-3579", "BUG-4680", "BUG-5791",
+    "BUG-6802", "BUG-7913", "BUG-8024", "BUG-9135", "BUG-0246"
+  ];
+
+  bugEl.addBtn.addEventListener("click", () => {
+    const usedNames = new Set(bugState.tickets.map(t => t.name));
+    const available = ticketNameInventory.filter(n => !usedNames.has(n));
+    const name = available.length > 0 
+      ? available[Math.floor(Math.random() * available.length)]
+      : `BUG-${Date.now().toString(36).toUpperCase()}`;
+    
+    const priorities = ["p0", "p1", "p2"];
+    // Weight towards P2 for realism
+    const weights = [0.1, 0.3, 0.6];
+    const rand = Math.random();
+    let priority = "p2";
+    let cumulative = 0;
+    for (let i = 0; i < priorities.length; i++) {
+      cumulative += weights[i];
+      if (rand < cumulative) {
+        priority = priorities[i];
+        break;
+      }
+    }
+    
+    bugState.tickets.push({ name, priority });
+    renderBugTable();
+    recomputeBug();
+  });
 
   // ---------- Bug Init ----------
   function syncBugControlsFromState() {
     bugEl.budget.value = bugState.budget;
-    bugEl.decay.value = bugState.decay;
+    bugEl.method.value = bugState.method;
     bugEl.wP0.value = bugState.weights.p0;
     bugEl.wP1.value = bugState.weights.p1;
     bugEl.wP2.value = bugState.weights.p2;
-    bugEl.countP0.value = bugState.counts.p0;
-    bugEl.countP1.value = bugState.counts.p1;
-    bugEl.countP2.value = bugState.counts.p2;
   }
   
   syncBugControlsFromState();
+  renderBugMethodParams();
+  renderBugTable();
   recomputeBug();
 
   // ==========================================================================
@@ -2866,15 +3220,66 @@ ${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.
     budget: 15,
     severityWeights: { sev1: 4.0, sev2: 2.0, sev3: 1.0, sev4: 0.5 },
     typeWeights: { postmortem: 3.0, actions: 2.0, metadata: 1.0 },
-    decay: 0.85,
-    incidents: [
-      { name: "Database outage", severity: "sev1", metadata: 0, actions: 1, postmortem: 0 },
-      { name: "API latency spike", severity: "sev2", metadata: 1, actions: 1, postmortem: 0 },
-      { name: "Payment processing delay", severity: "sev3", metadata: 2, actions: 0, postmortem: 1 }
+    method: "exponential",
+    params: {
+      exponential: { decay: 0.85 },
+      linear: { threshold: 10 },
+      inverse: { k: 1.0 },
+      logarithmic: { maxExpected: 20 },
+      sigmoid: { midpoint: 5, steepness: 1.0 },
+      bucket: { buckets: [[0, 1.0], [1, 0.8], [3, 0.5], [6, 0.2], [11, 0.0]] }
+    },
+    problems: [
+      { incident: "ALERT-4721", severity: "sev1", problemType: "actions", description: "Missing root cause analysis" },
+      { incident: "ALERT-3892", severity: "sev2", problemType: "metadata", description: "No timeline documented" },
+      { incident: "ALERT-3892", severity: "sev2", problemType: "actions", description: "Action items not assigned owners" },
+      { incident: "ALERT-1547", severity: "sev3", problemType: "metadata", description: "Impact scope unclear" },
+      { incident: "ALERT-1547", severity: "sev3", problemType: "metadata", description: "Detection time not recorded" },
+      { incident: "ALERT-1547", severity: "sev3", problemType: "postmortem", description: "Postmortem not completed within SLA" }
     ]
   });
 
   let pmState = savedState?.pm || defaultPmState();
+  
+  // Migration: convert old incidents format to problems format
+  if (pmState.incidents && !pmState.problems) {
+    pmState.problems = [];
+    pmState.incidents.forEach(inc => {
+      for (let i = 0; i < (inc.metadata || 0); i++) {
+        pmState.problems.push({
+          incident: inc.name,
+          severity: inc.severity,
+          problemType: "metadata",
+          description: `Missing metadata #${i + 1}`
+        });
+      }
+      for (let i = 0; i < (inc.actions || 0); i++) {
+        pmState.problems.push({
+          incident: inc.name,
+          severity: inc.severity,
+          problemType: "actions",
+          description: `Incomplete action #${i + 1}`
+        });
+      }
+      for (let i = 0; i < (inc.postmortem || 0); i++) {
+        pmState.problems.push({
+          incident: inc.name,
+          severity: inc.severity,
+          problemType: "postmortem",
+          description: `Incomplete postmortem #${i + 1}`
+        });
+      }
+    });
+    delete pmState.incidents;
+  }
+  
+  // Migration: convert old decay format to method/params format
+  if (pmState.decay && !pmState.method) {
+    pmState.method = "exponential";
+    pmState.params = defaultPmState().params;
+    pmState.params.exponential.decay = pmState.decay;
+    delete pmState.decay;
+  }
 
   // ---------- PM DOM ----------
   const pmEl = {
@@ -2886,7 +3291,10 @@ ${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.
     wActions: document.getElementById("pmWActions"),
     wMetadata: document.getElementById("pmWMetadata"),
     budget: document.getElementById("pmBudget"),
-    decay: document.getElementById("pmDecay"),
+    method: document.getElementById("pmMethod"),
+    methodParams: document.getElementById("pmMethodParams"),
+    chartCanvas: document.getElementById("pmChart"),
+    showAllMethods: document.getElementById("pmShowAllMethods"),
     tbody: document.getElementById("pmTbody"),
     addBtn: document.getElementById("addPm"),
     scoreS: document.getElementById("pmScoreS"),
@@ -2898,33 +3306,41 @@ ${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.
     formulaBox: document.getElementById("pmFormulaBox"),
   };
 
+  // PM chart instance
+  let pmChart = null;
+
   // ---------- Compute PM Score ----------
-  function computePmScore() {
+  function computePmScore(method, params) {
     const severityWeights = pmState.severityWeights;
     const typeWeights = pmState.typeWeights;
-    const decay = pmState.decay;
+    const calcFn = normMethods[method].calc;
     const problemTypes = ["metadata", "actions", "postmortem"];
     
-    // Aggregate problems by type across ALL incidents, weighted by severity
-    const weightedTotals = {};
-    problemTypes.forEach(type => {
-      weightedTotals[type] = pmState.incidents.reduce((sum, incident) => {
-        const count = incident[type] || 0;
-        const sevWeight = severityWeights[incident.severity] || 1;
-        return sum + (sevWeight * count);
-      }, 0);
+    // Aggregate problems by type, weighted by severity
+    const weightedTotals = { metadata: 0, actions: 0, postmortem: 0 };
+    const rawCounts = { metadata: 0, actions: 0, postmortem: 0 };
+    
+    pmState.problems.forEach(problem => {
+      const type = problem.problemType;
+      if (weightedTotals.hasOwnProperty(type)) {
+        const sevWeight = severityWeights[problem.severity] || 1;
+        weightedTotals[type] += sevWeight;
+        rawCounts[type]++;
+      }
     });
     
-    // Normalize each type's weighted total using exponential decay
+    // Normalize each type's weighted total using selected method
     const items = problemTypes.map(type => {
       const weightedCount = weightedTotals[type];
+      const rawCount = rawCounts[type];
       const w = typeWeights[type];
-      const s = Math.pow(decay, weightedCount);
+      const s = calcFn(weightedCount, params);
       return { 
         name: type === "metadata" ? "Missing metadata" : 
               type === "actions" ? "Incomplete actions" : 
               "Incomplete postmortem",
         type, 
+        rawCount,
         weightedCount, 
         w, 
         s, 
@@ -2936,7 +3352,7 @@ ${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.
     const numer = items.reduce((sum, it) => sum + it.ws, 0);
     const S = denom > 0 ? numer / denom : 1;
     
-    return { items, denom, numer, S, weightedTotals };
+    return { items, denom, numer, S, weightedTotals, rawCounts };
   }
 
   function recomputePm() {
@@ -2949,9 +3365,12 @@ ${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.
     pmState.typeWeights.actions = Number(pmEl.wActions.value) || 2;
     pmState.typeWeights.metadata = Number(pmEl.wMetadata.value) || 1;
     pmState.budget = Number(pmEl.budget.value) || 20;
-    pmState.decay = Number(pmEl.decay.value) || 0.85;
+    pmState.method = pmEl.method.value;
     
-    const { items, denom, numer, S } = computePmScore();
+    const method = pmState.method;
+    const params = pmState.params[method];
+    
+    const { items, denom, numer, S } = computePmScore(method, params);
     const score = pmState.budget * clamp(S, 0, 1);
     
     // Update KPIs
@@ -2961,12 +3380,15 @@ ${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.
     pmEl.scoreBar.style.width = (S * 100).toFixed(1) + "%";
     
     // Status note
-    const totalProblems = pmState.incidents.reduce((sum, inc) => 
-      sum + inc.metadata + inc.actions + inc.postmortem, 0);
-    pmEl.scoreNote.textContent = `${totalProblems} problems across ${pmState.incidents.length} incident(s)`;
+    const totalProblems = pmState.problems.length;
+    const uniqueIncidents = new Set(pmState.problems.map(p => p.incident)).size;
+    pmEl.scoreNote.textContent = `${totalProblems} problem(s) across ${uniqueIncidents} incident(s)`;
     
     // Render aggregate table
     renderPmAggTable(items, denom, numer, S);
+    
+    // Render chart
+    renderPmChart();
     
     // Render formula
     renderPmFormula(items, denom, numer, S, score);
@@ -2989,15 +3411,16 @@ ${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.
     tbody.innerHTML = "";
     tfoot.innerHTML = "";
     
-    if (pmState.incidents.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" class="muted">No incidents defined.</td></tr>`;
+    if (pmState.problems.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="muted">No problems defined.</td></tr>`;
       return;
     }
     
     thead.innerHTML = `
       <tr>
         <th>Problem Type</th>
-        <th class="right">Weighted Count</th>
+        <th class="right">Count</th>
+        <th class="right">Weighted</th>
         <th class="right">sᵢ</th>
         <th class="right">wᵢ</th>
         <th class="right">wᵢ · sᵢ</th>
@@ -3008,6 +3431,7 @@ ${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${escapeHtml(it.name)}</td>
+        <td class="mono right">${it.rawCount}</td>
         <td class="mono right">${fmt(it.weightedCount, 2)}</td>
         <td class="mono right">${fmt(it.s, 4)}</td>
         <td class="mono right">${fmt(it.w, 2)}</td>
@@ -3021,83 +3445,312 @@ ${items.map(it => `    ${it.name}: s = ${bugState.decay}^${it.count} = ${fmt(it.
         <td>Total</td>
         <td class="mono right muted">—</td>
         <td class="mono right muted">—</td>
+        <td class="mono right muted">—</td>
         <td class="mono right">${fmt(denom, 2)}</td>
         <td class="mono right">${fmt(numer, 4)}</td>
       </tr>
       <tr>
-        <td colspan="4" style="text-align: right; padding-right: 10px;">S = Σ(wᵢ·sᵢ) / Σ(wᵢ) =</td>
+        <td colspan="5" style="text-align: right; padding-right: 10px;">S = Σ(wᵢ·sᵢ) / Σ(wᵢ) =</td>
         <td class="mono right" style="font-size: 16px;">${fmt(S, 4)}</td>
       </tr>
     `;
   }
 
   function renderPmFormula(items, denom, numer, S, score) {
+    const method = pmState.method;
+    const params = pmState.params[method];
+    const methodInfo = normMethods[method];
     const sevWeightsDesc = `Sev1=${pmState.severityWeights.sev1}, Sev2=${pmState.severityWeights.sev2}, Sev3=${pmState.severityWeights.sev3}, Sev4=${pmState.severityWeights.sev4}`;
     const typeWeightsDesc = `Postmortem=${pmState.typeWeights.postmortem}, Actions=${pmState.typeWeights.actions}, Metadata=${pmState.typeWeights.metadata}`;
     
-    // Build incident breakdown
-    const incidentBreakdown = pmState.incidents.map(inc => {
-      const sevWeight = pmState.severityWeights[inc.severity];
-      const problems = [];
-      if (inc.metadata > 0) problems.push(`${inc.metadata} metadata`);
-      if (inc.actions > 0) problems.push(`${inc.actions} actions`);
-      if (inc.postmortem > 0) problems.push(`${inc.postmortem} postmortem`);
-      return `    ${inc.name} (${inc.severity.toUpperCase()}, weight=${sevWeight}): ${problems.join(", ") || "none"}`;
-    }).join("\n");
+    // Build problem breakdown
+    const problemBreakdown = pmState.problems.map(p => {
+      const sevWeight = pmState.severityWeights[p.severity];
+      const typeLabel = p.problemType === "metadata" ? "metadata" : 
+                        p.problemType === "actions" ? "actions" : "postmortem";
+      return `    ${p.incident} (${p.severity.toUpperCase()}, w=${sevWeight}): ${typeLabel} - "${p.description}"`;
+    }).join("\n") || "    (no problems)";
     
     pmEl.formulaBox.textContent = 
 `DEFINITIONS
   Severity weights: ${sevWeightsDesc}
   Problem type weights: ${typeWeightsDesc}
-  λ (decay rate) = ${pmState.decay}
+  Normalization: ${methodInfo.name}
+  Formula: ${methodInfo.formula(params)}
   
   wᵢ    = weight for problem type i
-  sᵢ    = normalized score for type i = λ^(weighted count)
+  sᵢ    = normalized score for type i
   S     = weighted average of all type scores (0–1)
   Score = final scorecard value (budget × S)
 
-HOW IT WORKS
-  1. Aggregate problems by type across all incidents:
-     weighted_count = Σ(severity_weight × problem_count)
+CURRENT PROBLEMS (${pmState.problems.length} total)
+${problemBreakdown}
+
+AGGREGATION BY TYPE
+  Each problem contributes its severity weight to its type's weighted count.
   
-  2. Current incidents:
-${incidentBreakdown}
+  Weighted totals by type:
+${items.map(it => `     ${it.name}: ${it.rawCount} problems → weighted ${fmt(it.weightedCount, 2)}`).join("\n")}
   
-  3. Weighted totals by type:
-${items.map(it => `     ${it.name}: ${fmt(it.weightedCount, 2)}`).join("\n")}
+CALCULATION
+  Normalize each type:
+${items.map(it => `     ${it.name}: weighted=${fmt(it.weightedCount, 2)} → s = ${fmt(it.s, 4)}`).join("\n")}
   
-  4. Normalize each type: sᵢ = ${pmState.decay}^weighted_count
-${items.map(it => `     ${it.name}: ${fmt(it.s, 4)}`).join("\n")}
-  
-  5. Weighted average:
+  Weighted average:
      S = Σ(wᵢ × sᵢ) / Σ(wᵢ)
      S = ${fmt(numer, 4)} / ${fmt(denom, 4)} = ${fmt(S, 4)}
   
-  6. Final score:
+  Final score:
      score = ${pmState.budget} × ${fmt(S, 4)} = ${fmt2(score)}
 `;
+  }
+
+  // ---------- Render PM Chart ----------
+  function renderPmChart() {
+    const showAll = pmEl.showAllMethods.checked;
+    const currentMethod = pmState.method;
+    const maxCount = 25;
+    
+    const labels = Array.from({ length: maxCount + 1 }, (_, i) => i);
+    const datasets = [];
+    
+    if (showAll) {
+      Object.entries(normMethods).forEach(([key, methodInfo]) => {
+        const params = pmState.params[key];
+        const data = labels.map(count => methodInfo.calc(count, params));
+        const isSelected = key === currentMethod;
+        
+        datasets.push({
+          label: methodInfo.name,
+          data: data,
+          borderColor: methodColors[key].border,
+          backgroundColor: isSelected ? methodColors[key].bg : "transparent",
+          borderWidth: isSelected ? 3 : 1.5,
+          pointRadius: 0,
+          tension: key === "bucket" ? 0 : 0.3,
+          stepped: key === "bucket" ? "before" : false,
+          fill: isSelected,
+          order: isSelected ? 0 : 1
+        });
+      });
+    } else {
+      const params = pmState.params[currentMethod];
+      const methodInfo = normMethods[currentMethod];
+      const data = labels.map(count => methodInfo.calc(count, params));
+      
+      datasets.push({
+        label: methodInfo.name,
+        data: data,
+        borderColor: methodColors[currentMethod].border,
+        backgroundColor: methodColors[currentMethod].bg,
+        borderWidth: 3,
+        pointRadius: 0,
+        tension: currentMethod === "bucket" ? 0 : 0.3,
+        stepped: currentMethod === "bucket" ? "before" : false,
+        fill: true
+      });
+    }
+    
+    if (pmChart) {
+      pmChart.data.labels = labels;
+      pmChart.data.datasets = datasets;
+      pmChart.options.plugins.legend.display = showAll;
+      pmChart.update("none");
+    } else {
+      pmChart = new Chart(pmEl.chartCanvas, {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: "index" },
+          plugins: {
+            legend: {
+              display: showAll,
+              position: "bottom",
+              labels: { color: "#a9b4d6", font: { size: 11 }, boxWidth: 12, padding: 8 }
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: "Weighted Problem Count", color: "#a9b4d6", font: { size: 11 } },
+              ticks: { color: "#a9b4d6", font: { size: 10 } },
+              grid: { color: "rgba(255,255,255,0.06)" }
+            },
+            y: {
+              min: 0,
+              max: 1,
+              title: { display: true, text: "Normalized Score (sᵢ)", color: "#a9b4d6", font: { size: 11 } },
+              ticks: { color: "#a9b4d6", font: { size: 10 } },
+              grid: { color: "rgba(255,255,255,0.06)" }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  // ---------- Render PM Method Params ----------
+  function renderPmMethodParams() {
+    const method = pmState.method;
+    const params = pmState.params[method];
+    const methodInfo = normMethods[method];
+    
+    let html = "";
+    
+    if (method === "exponential") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Decay rate:</span>
+          <input type="number" id="pmParamDecay" step="0.05" min="0.1" max="0.99" value="${params.decay}" style="width: 80px;" />
+          <span class="muted small">Each weighted unit multiplies score by this</span>
+        </div>
+      `;
+    } else if (method === "linear") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Threshold:</span>
+          <input type="number" id="pmParamThreshold" step="1" min="1" value="${params.threshold}" style="width: 80px;" />
+          <span class="muted small">Weighted count at which score = 0</span>
+        </div>
+      `;
+    } else if (method === "inverse") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Steepness (k):</span>
+          <input type="number" id="pmParamK" step="0.1" min="0.1" value="${params.k}" style="width: 80px;" />
+          <span class="muted small">Higher = faster drop</span>
+        </div>
+      `;
+    } else if (method === "logarithmic") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Max expected:</span>
+          <input type="number" id="pmParamMax" step="1" min="1" value="${params.maxExpected}" style="width: 80px;" />
+          <span class="muted small">Weighted count at which score = 0</span>
+        </div>
+      `;
+    } else if (method === "sigmoid") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Midpoint:</span>
+          <input type="number" id="pmParamMidpoint" step="1" min="1" value="${params.midpoint}" style="width: 80px;" />
+          <span class="muted small">Count where score = 0.5</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">Steepness:</span>
+          <input type="number" id="pmParamSteepness" step="0.1" min="0.1" value="${params.steepness}" style="width: 80px;" />
+          <span class="muted small">Higher = sharper transition</span>
+        </div>
+      `;
+    } else if (method === "bucket") {
+      html = `
+        <div class="param-row">
+          <span class="muted small">Bucket definitions (weighted count threshold → score):</span>
+        </div>
+        <div class="param-row" style="flex-wrap: wrap; gap: 6px;">
+          ${params.buckets.map(([t, s]) => `
+            <span class="mono" style="background: rgba(255,255,255,.1); padding: 4px 8px; border-radius: 6px;">
+              ${t}+ → ${fmt2(s)}
+            </span>
+          `).join("")}
+        </div>
+      `;
+    }
+    
+    html += `
+      <div class="formula-display" id="pmParamFormula">Formula: ${methodInfo.formula(params)}</div>
+      <div class="example-display" id="pmParamExample">Example: ${methodInfo.examples(params)}</div>
+    `;
+    
+    pmEl.methodParams.innerHTML = html;
+    attachPmParamListeners();
+  }
+
+  function updatePmFormulaDisplay() {
+    const method = pmState.method;
+    const params = pmState.params[method];
+    const methodInfo = normMethods[method];
+    
+    const formulaEl = document.getElementById("pmParamFormula");
+    const exampleEl = document.getElementById("pmParamExample");
+    
+    if (formulaEl) formulaEl.textContent = `Formula: ${methodInfo.formula(params)}`;
+    if (exampleEl) exampleEl.textContent = `Example: ${methodInfo.examples(params)}`;
+  }
+
+  function attachPmParamListeners() {
+    const method = pmState.method;
+    
+    if (method === "exponential") {
+      const inp = document.getElementById("pmParamDecay");
+      if (inp) inp.addEventListener("input", () => {
+        pmState.params.exponential.decay = Number(inp.value) || 0.85;
+        updatePmFormulaDisplay();
+        recomputePm();
+      });
+    } else if (method === "linear") {
+      const inp = document.getElementById("pmParamThreshold");
+      if (inp) inp.addEventListener("input", () => {
+        pmState.params.linear.threshold = Number(inp.value) || 10;
+        updatePmFormulaDisplay();
+        recomputePm();
+      });
+    } else if (method === "inverse") {
+      const inp = document.getElementById("pmParamK");
+      if (inp) inp.addEventListener("input", () => {
+        pmState.params.inverse.k = Number(inp.value) || 1;
+        updatePmFormulaDisplay();
+        recomputePm();
+      });
+    } else if (method === "logarithmic") {
+      const inp = document.getElementById("pmParamMax");
+      if (inp) inp.addEventListener("input", () => {
+        pmState.params.logarithmic.maxExpected = Number(inp.value) || 20;
+        updatePmFormulaDisplay();
+        recomputePm();
+      });
+    } else if (method === "sigmoid") {
+      const mid = document.getElementById("pmParamMidpoint");
+      const steep = document.getElementById("pmParamSteepness");
+      if (mid) mid.addEventListener("input", () => {
+        pmState.params.sigmoid.midpoint = Number(mid.value) || 5;
+        updatePmFormulaDisplay();
+        recomputePm();
+      });
+      if (steep) steep.addEventListener("input", () => {
+        pmState.params.sigmoid.steepness = Number(steep.value) || 1;
+        updatePmFormulaDisplay();
+        recomputePm();
+      });
+    }
   }
 
   // ---------- Render PM Table ----------
   function renderPmTable() {
     pmEl.tbody.innerHTML = "";
     
-    pmState.incidents.forEach((inc, idx) => {
+    pmState.problems.forEach((problem, idx) => {
       const tr = document.createElement("tr");
       
       tr.innerHTML = `
-        <td><input type="text" value="${escapeHtml(inc.name)}" style="width: 140px;" data-idx="${idx}" data-field="name" /></td>
+        <td><input type="text" value="${escapeHtml(problem.incident)}" style="width: 170px;" data-idx="${idx}" data-field="incident" /></td>
         <td>
-          <select data-idx="${idx}" data-field="severity" style="width: 70px;">
-            <option value="sev1" ${inc.severity === "sev1" ? "selected" : ""}>Sev1</option>
-            <option value="sev2" ${inc.severity === "sev2" ? "selected" : ""}>Sev2</option>
-            <option value="sev3" ${inc.severity === "sev3" ? "selected" : ""}>Sev3</option>
-            <option value="sev4" ${inc.severity === "sev4" ? "selected" : ""}>Sev4</option>
+          <select data-idx="${idx}" data-field="severity" style="width: 76px;">
+            <option value="sev1" ${problem.severity === "sev1" ? "selected" : ""}>Sev1</option>
+            <option value="sev2" ${problem.severity === "sev2" ? "selected" : ""}>Sev2</option>
+            <option value="sev3" ${problem.severity === "sev3" ? "selected" : ""}>Sev3</option>
+            <option value="sev4" ${problem.severity === "sev4" ? "selected" : ""}>Sev4</option>
           </select>
         </td>
-        <td><input type="number" value="${inc.metadata}" min="0" style="width: 60px;" data-idx="${idx}" data-field="metadata" /></td>
-        <td><input type="number" value="${inc.actions}" min="0" style="width: 60px;" data-idx="${idx}" data-field="actions" /></td>
-        <td><input type="number" value="${inc.postmortem}" min="0" style="width: 60px;" data-idx="${idx}" data-field="postmortem" /></td>
+        <td>
+          <select data-idx="${idx}" data-field="problemType" style="width: 120px;">
+            <option value="metadata" ${problem.problemType === "metadata" ? "selected" : ""}>Metadata</option>
+            <option value="actions" ${problem.problemType === "actions" ? "selected" : ""}>Actions</option>
+            <option value="postmortem" ${problem.problemType === "postmortem" ? "selected" : ""}>Postmortem</option>
+          </select>
+        </td>
+        <td><input type="text" value="${escapeHtml(problem.description)}" style="width: 200px;" data-idx="${idx}" data-field="description" placeholder="Brief description..." /></td>
         <td><button class="btn danger" data-idx="${idx}">Remove</button></td>
       `;
       
@@ -3109,21 +3762,13 @@ ${items.map(it => `     ${it.name}: ${fmt(it.s, 4)}`).join("\n")}
       inp.addEventListener("input", () => {
         const idx = Number(inp.dataset.idx);
         const field = inp.dataset.field;
-        if (field === "name" || field === "severity") {
-          pmState.incidents[idx][field] = inp.value;
-        } else {
-          pmState.incidents[idx][field] = Number(inp.value) || 0;
-        }
+        pmState.problems[idx][field] = inp.value;
         recomputePm();
       });
       inp.addEventListener("change", () => {
         const idx = Number(inp.dataset.idx);
         const field = inp.dataset.field;
-        if (field === "name" || field === "severity") {
-          pmState.incidents[idx][field] = inp.value;
-        } else {
-          pmState.incidents[idx][field] = Number(inp.value) || 0;
-        }
+        pmState.problems[idx][field] = inp.value;
         recomputePm();
       });
     });
@@ -3131,7 +3776,7 @@ ${items.map(it => `     ${it.name}: ${fmt(it.s, 4)}`).join("\n")}
     pmEl.tbody.querySelectorAll("button").forEach(btn => {
       btn.addEventListener("click", () => {
         const idx = Number(btn.dataset.idx);
-        pmState.incidents.splice(idx, 1);
+        pmState.problems.splice(idx, 1);
         renderPmTable();
         recomputePm();
       });
@@ -3147,42 +3792,83 @@ ${items.map(it => `     ${it.name}: ${fmt(it.s, 4)}`).join("\n")}
   pmEl.wActions.addEventListener("input", recomputePm);
   pmEl.wMetadata.addEventListener("input", recomputePm);
   pmEl.budget.addEventListener("input", recomputePm);
-  pmEl.decay.addEventListener("input", recomputePm);
+  pmEl.method.addEventListener("change", () => {
+    pmState.method = pmEl.method.value;
+    renderPmMethodParams();
+    recomputePm();
+  });
+  pmEl.showAllMethods.addEventListener("change", renderPmChart);
 
-  const incidentNameInventory = [
-    "Database outage",
-    "API latency spike",
-    "Payment processing delay",
-    "Memory leak in production",
-    "CDN failover incident",
-    "Authentication service down",
-    "Data replication lag",
-    "Cache invalidation issue",
-    "Deployment rollback",
-    "Network partition",
-    "Disk space exhaustion",
-    "Rate limit breach",
-    "Third-party API timeout",
-    "SSL certificate expiration",
-    "Load balancer misconfiguration"
-  ];
+  function generateAlertId() {
+    const num = Math.floor(Math.random() * 9000) + 1000; // 1000-9999
+    return `ALERT-${num}`;
+  }
+
+  const problemDescriptions = {
+    metadata: [
+      "No timeline documented",
+      "Impact scope unclear", 
+      "Detection time not recorded",
+      "Customer impact not quantified",
+      "Missing affected services list"
+    ],
+    actions: [
+      "Action items not assigned owners",
+      "Missing due dates on actions",
+      "Follow-up tasks incomplete",
+      "Preventive measures not defined",
+      "Monitoring gaps not addressed"
+    ],
+    postmortem: [
+      "Postmortem not completed within SLA",
+      "Missing root cause analysis",
+      "No lessons learned section",
+      "Review meeting not held",
+      "Document not shared with stakeholders"
+    ]
+  };
 
   pmEl.addBtn.addEventListener("click", () => {
-    const usedNames = new Set(pmState.incidents.map(i => i.name));
-    const available = incidentNameInventory.filter(n => !usedNames.has(n));
-    const name = available.length > 0 
-      ? available[Math.floor(Math.random() * available.length)]
-      : `Incident ${pmState.incidents.length + 1}`;
+    // Generate a random ALERT-XXXX incident name
+    const incident = generateAlertId();
     
+    // Random severity, weighted towards sev2/sev3
     const severities = ["sev1", "sev2", "sev3", "sev4"];
-    const severity = severities[Math.floor(Math.random() * severities.length)];
+    const sevWeights = [0.15, 0.35, 0.35, 0.15];
+    const rand = Math.random();
+    let severity = "sev2";
+    let cumulative = 0;
+    for (let i = 0; i < severities.length; i++) {
+      cumulative += sevWeights[i];
+      if (rand < cumulative) {
+        severity = severities[i];
+        break;
+      }
+    }
     
-    pmState.incidents.push({
-      name,
+    // Random problem type, weighted towards metadata
+    const problemTypes = ["metadata", "actions", "postmortem"];
+    const typeWeights = [0.4, 0.4, 0.2];
+    const typeRand = Math.random();
+    let problemType = "metadata";
+    cumulative = 0;
+    for (let i = 0; i < problemTypes.length; i++) {
+      cumulative += typeWeights[i];
+      if (typeRand < cumulative) {
+        problemType = problemTypes[i];
+        break;
+      }
+    }
+    
+    // Pick a random description for the problem type
+    const descriptions = problemDescriptions[problemType];
+    const description = descriptions[Math.floor(Math.random() * descriptions.length)];
+    
+    pmState.problems.push({
+      incident,
       severity,
-      metadata: Math.floor(Math.random() * 3),
-      actions: Math.floor(Math.random() * 3),
-      postmortem: Math.random() > 0.7 ? 1 : 0
+      problemType,
+      description
     });
     renderPmTable();
     recomputePm();
@@ -3191,7 +3877,7 @@ ${items.map(it => `     ${it.name}: ${fmt(it.s, 4)}`).join("\n")}
   // ---------- PM Init ----------
   function syncPmControlsFromState() {
     pmEl.budget.value = pmState.budget;
-    pmEl.decay.value = pmState.decay;
+    pmEl.method.value = pmState.method;
     pmEl.wSev1.value = pmState.severityWeights.sev1;
     pmEl.wSev2.value = pmState.severityWeights.sev2;
     pmEl.wSev3.value = pmState.severityWeights.sev3;
@@ -3202,8 +3888,13 @@ ${items.map(it => `     ${it.name}: ${fmt(it.s, 4)}`).join("\n")}
   }
   
   syncPmControlsFromState();
+  renderPmMethodParams();
   renderPmTable();
   recomputePm();
+
+  // All sections initialized, enable state saving
+  allSectionsInitialized = true;
+  saveAllState(); // Save initial state
 </script>
 </body>
 </html>
