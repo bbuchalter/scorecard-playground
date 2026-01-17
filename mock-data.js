@@ -305,12 +305,7 @@ function loadMockData() {
   try {
     const saved = localStorage.getItem(MOCK_DATA_KEY);
     if (saved) {
-      const data = JSON.parse(saved);
-      // Migrate legacy data to add ownership if missing
-      if (migrateMockData(data)) {
-        saveMockData(data);
-      }
-      return data;
+      return JSON.parse(saved);
     }
   } catch (e) {
     console.warn("Could not load mock data from localStorage:", e);
@@ -406,43 +401,11 @@ function getAllTeamPaths() {
   return paths;
 }
 
-// Migrate legacy mock data to add ownership if missing
-// Returns true if any data was migrated
-function migrateMockData(data) {
-  let migrated = false;
-  
-  Object.keys(data).forEach(groupKey => {
-    const group = data[groupKey];
-    if (group && group.teams) {
-      Object.keys(group.teams).forEach(teamKey => {
-        const team = group.teams[teamKey];
-        if (team.subTeams) {
-          // Team with sub-teams
-          Object.keys(team.subTeams).forEach(subTeamKey => {
-            const subTeam = team.subTeams[subTeamKey];
-            if (subTeam && !subTeam.ownership) {
-              subTeam.ownership = generateOwnership();
-              migrated = true;
-            }
-          });
-        } else if (team && !team.ownership) {
-          // Leaf team
-          team.ownership = generateOwnership();
-          migrated = true;
-        }
-      });
-    }
-  });
-  
-  return migrated;
-}
-
-// Get or generate ownership for a team (handles legacy data without ownership)
+// Get or generate ownership for a team
 function getOrGenerateOwnership(teamData) {
   if (teamData && teamData.ownership) {
     return teamData.ownership;
   }
-  // Generate ownership on-the-fly for legacy data
   return generateOwnership();
 }
 
@@ -459,8 +422,7 @@ if (typeof module !== 'undefined' && module.exports) {
     updateMockDataForTeam,
     getAllTeamPaths,
     generateOwnership,
-    getOrGenerateOwnership,
-    migrateMockData
+    getOrGenerateOwnership
   };
 }
 
@@ -477,7 +439,6 @@ if (typeof window !== 'undefined') {
     updateMockDataForTeam,
     getAllTeamPaths,
     generateOwnership,
-    getOrGenerateOwnership,
-    migrateMockData
+    getOrGenerateOwnership
   };
 }
