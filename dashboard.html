@@ -2355,25 +2355,65 @@
   }
 
   // ========== NAVIGATION ==========
+  function updateUrl(path, pushState = true) {
+    const url = new URL(window.location);
+    if (path.length > 0) {
+      url.searchParams.set('team', JSON.stringify(path));
+    } else {
+      url.searchParams.delete('team');
+    }
+    
+    if (pushState) {
+      history.pushState({ navigationPath: path }, '', url);
+    } else {
+      history.replaceState({ navigationPath: path }, '', url);
+    }
+  }
+
   function navigateToGroup(groupKey) {
     navigationPath = [groupKey];
+    updateUrl(navigationPath);
     render();
   }
 
   function navigateToTeam(groupKey, teamKey) {
     navigationPath = [groupKey, teamKey];
+    updateUrl(navigationPath);
     render();
   }
 
   function navigateToSubTeam(groupKey, teamKey, subTeamKey) {
     navigationPath = [groupKey, teamKey, subTeamKey];
+    updateUrl(navigationPath);
     render();
   }
 
   function navigateToTopLevel() {
     navigationPath = [];
+    updateUrl(navigationPath);
     render();
   }
+
+  // Handle browser back/forward buttons
+  window.addEventListener('popstate', (event) => {
+    if (event.state && event.state.navigationPath !== undefined) {
+      navigationPath = event.state.navigationPath;
+    } else {
+      // Parse from URL if no state (e.g., initial page load)
+      const urlParams = new URLSearchParams(window.location.search);
+      const teamParam = urlParams.get('team');
+      if (teamParam) {
+        try {
+          navigationPath = JSON.parse(teamParam);
+        } catch (e) {
+          navigationPath = [];
+        }
+      } else {
+        navigationPath = [];
+      }
+    }
+    render();
+  });
 
   // ========== INITIALIZATION ==========
   document.addEventListener('DOMContentLoaded', () => {
@@ -2399,6 +2439,9 @@
         // Invalid JSON, ignore
       }
     }
+    
+    // Set initial history state so back button works from first navigation
+    updateUrl(navigationPath, false);
     
     render();
   });
