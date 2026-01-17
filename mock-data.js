@@ -76,6 +76,40 @@ const organizationHierarchy = {
   }
 };
 
+// Sample first and last names for ownership generation
+const firstNames = [
+  "Alex", "Jordan", "Taylor", "Casey", "Morgan", "Riley", "Quinn", "Avery",
+  "Jamie", "Cameron", "Drew", "Hayden", "Skyler", "Reese", "Blake", "Parker",
+  "Sam", "Chris", "Pat", "Dana", "Jesse", "Robin", "Shannon", "Kelly",
+  "Maria", "David", "Sarah", "Michael", "Jennifer", "James", "Emily", "Robert",
+  "Lisa", "William", "Amanda", "Daniel", "Rachel", "Matthew", "Nicole", "Andrew",
+  "Priya", "Wei", "Yuki", "Carlos", "Sofia", "Omar", "Fatima", "Raj"
+];
+
+const lastNames = [
+  "Chen", "Rodriguez", "Patel", "Williams", "Kim", "Nguyen", "Martinez", "Garcia",
+  "Johnson", "Smith", "Lee", "Brown", "Miller", "Davis", "Wilson", "Taylor",
+  "Anderson", "Thomas", "Jackson", "White", "Harris", "Martin", "Thompson", "Moore",
+  "Young", "Allen", "King", "Wright", "Scott", "Green", "Baker", "Adams",
+  "Kumar", "Singh", "Wang", "Liu", "Yamamoto", "Santos", "Ali", "Ibrahim"
+];
+
+// Generate a random name
+function generateRandomName() {
+  const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+  const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+  return `${firstName} ${lastName}`;
+}
+
+// Generate ownership info for a team
+function generateOwnership() {
+  return {
+    engineeringManager: generateRandomName(),
+    productManager: generateRandomName(),
+    reliabilityDRI: generateRandomName()
+  };
+}
+
 // Sample SLO names
 const sloNames = [
   "API availability", "Checkout latency", "Login success rate", "Payment processing time",
@@ -103,7 +137,8 @@ function generateTeamData(targetScore) {
     slos: [],
     images: [],
     tickets: [],
-    problems: []
+    problems: [],
+    ownership: generateOwnership()
   };
 
   // Generate 3-8 SLOs
@@ -270,7 +305,12 @@ function loadMockData() {
   try {
     const saved = localStorage.getItem(MOCK_DATA_KEY);
     if (saved) {
-      return JSON.parse(saved);
+      const data = JSON.parse(saved);
+      // Migrate legacy data to add ownership if missing
+      if (migrateMockData(data)) {
+        saveMockData(data);
+      }
+      return data;
     }
   } catch (e) {
     console.warn("Could not load mock data from localStorage:", e);
@@ -366,6 +406,46 @@ function getAllTeamPaths() {
   return paths;
 }
 
+// Migrate legacy mock data to add ownership if missing
+// Returns true if any data was migrated
+function migrateMockData(data) {
+  let migrated = false;
+  
+  Object.keys(data).forEach(groupKey => {
+    const group = data[groupKey];
+    if (group && group.teams) {
+      Object.keys(group.teams).forEach(teamKey => {
+        const team = group.teams[teamKey];
+        if (team.subTeams) {
+          // Team with sub-teams
+          Object.keys(team.subTeams).forEach(subTeamKey => {
+            const subTeam = team.subTeams[subTeamKey];
+            if (subTeam && !subTeam.ownership) {
+              subTeam.ownership = generateOwnership();
+              migrated = true;
+            }
+          });
+        } else if (team && !team.ownership) {
+          // Leaf team
+          team.ownership = generateOwnership();
+          migrated = true;
+        }
+      });
+    }
+  });
+  
+  return migrated;
+}
+
+// Get or generate ownership for a team (handles legacy data without ownership)
+function getOrGenerateOwnership(teamData) {
+  if (teamData && teamData.ownership) {
+    return teamData.ownership;
+  }
+  // Generate ownership on-the-fly for legacy data
+  return generateOwnership();
+}
+
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -377,7 +457,10 @@ if (typeof module !== 'undefined' && module.exports) {
     resetMockData,
     getMockDataForTeam,
     updateMockDataForTeam,
-    getAllTeamPaths
+    getAllTeamPaths,
+    generateOwnership,
+    getOrGenerateOwnership,
+    migrateMockData
   };
 }
 
@@ -392,6 +475,9 @@ if (typeof window !== 'undefined') {
     resetMockData,
     getMockDataForTeam,
     updateMockDataForTeam,
-    getAllTeamPaths
+    getAllTeamPaths,
+    generateOwnership,
+    getOrGenerateOwnership,
+    migrateMockData
   };
 }

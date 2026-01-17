@@ -379,6 +379,39 @@
       position: relative;
     }
 
+    .ownership-info {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--muted);
+      max-width: 160px;
+    }
+
+    .ownership-row {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .ownership-role {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(169, 180, 214, 0.7);
+    }
+
+    .ownership-name {
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .hero-grade-title {
       font-size: 18px;
       font-weight: 600;
@@ -1130,6 +1163,77 @@
     return `index.html?team=${teamParam}`;
   }
 
+  // Get ownership info for the current navigation level
+  // Uses getOrGenerateOwnership to handle legacy data without ownership
+  function getOwnershipInfo() {
+    const getOrGenerate = window.MockData.getOrGenerateOwnership;
+    
+    if (navigationPath.length === 0) {
+      // Top-level R&D - no specific ownership
+      return null;
+    } else if (navigationPath.length === 1) {
+      // Group level - aggregate from first team with ownership
+      const groupKey = navigationPath[0];
+      const groupMockData = mockData[groupKey];
+      if (groupMockData && groupMockData.teams) {
+        const firstTeamKey = Object.keys(groupMockData.teams)[0];
+        const firstTeam = groupMockData.teams[firstTeamKey];
+        if (firstTeam.subTeams) {
+          const firstSubTeamKey = Object.keys(firstTeam.subTeams)[0];
+          return getOrGenerate(firstTeam.subTeams[firstSubTeamKey]);
+        }
+        return getOrGenerate(firstTeam);
+      }
+      return null;
+    } else if (navigationPath.length === 2) {
+      // Team level
+      const groupKey = navigationPath[0];
+      const teamKey = navigationPath[1];
+      const groupMockData = mockData[groupKey];
+      if (groupMockData && groupMockData.teams && groupMockData.teams[teamKey]) {
+        const teamData = groupMockData.teams[teamKey];
+        if (teamData.subTeams) {
+          const firstSubTeamKey = Object.keys(teamData.subTeams)[0];
+          return getOrGenerate(teamData.subTeams[firstSubTeamKey]);
+        }
+        return getOrGenerate(teamData);
+      }
+      return null;
+    } else if (navigationPath.length === 3) {
+      // Sub-team level
+      const groupKey = navigationPath[0];
+      const teamKey = navigationPath[1];
+      const subTeamKey = navigationPath[2];
+      const groupMockData = mockData[groupKey];
+      if (groupMockData && groupMockData.teams && groupMockData.teams[teamKey] &&
+          groupMockData.teams[teamKey].subTeams) {
+        return getOrGenerate(groupMockData.teams[teamKey].subTeams[subTeamKey]);
+      }
+      return null;
+    }
+    return null;
+  }
+
+  function renderOwnershipHtml(ownership) {
+    if (!ownership) return '';
+    return `
+      <div class="ownership-info">
+        <div class="ownership-row">
+          <span class="ownership-role">Engineering Manager</span>
+          <span class="ownership-name">${escapeHtml(ownership.engineeringManager)}</span>
+        </div>
+        <div class="ownership-row">
+          <span class="ownership-role">Product Manager</span>
+          <span class="ownership-name">${escapeHtml(ownership.productManager)}</span>
+        </div>
+        <div class="ownership-row">
+          <span class="ownership-role">Reliability DRI</span>
+          <span class="ownership-name">${escapeHtml(ownership.reliabilityDRI)}</span>
+        </div>
+      </div>
+    `;
+  }
+
   function calculatePriorityWork() {
     const current = getCurrentData();
     
@@ -1384,6 +1488,7 @@
         createSparkline('chart-hero-grade', overallTrend, overallAvg);
       }, 0);
     } else if (current.type === 'group') {
+      const ownership = getOwnershipInfo();
       // Show specific group grade
       const group = current.data;
       const avg = calculateAverage(group);
@@ -1395,6 +1500,7 @@
         <div class="hero-section-wrapper">
           <div class="hero-section">
             <div class="hero-grade">
+              ${renderOwnershipHtml(ownership)}
               <div class="hero-grade-title">${group.name}</div>
               <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
               <div class="hero-grade-score">${avg}/100</div>
@@ -1423,6 +1529,7 @@
         createSparkline('chart-hero-grade', trend, avg);
       }, 0);
     } else if (current.type === 'team') {
+      const ownership = getOwnershipInfo();
       // Show specific team grade
       const team = current.data;
       const teamName = navigationPath[1];
@@ -1446,6 +1553,7 @@
         <div class="hero-section-wrapper">
           <div class="hero-section">
             <div class="hero-grade">
+              ${renderOwnershipHtml(ownership)}
               <div class="hero-grade-title">${teamName}</div>
               <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
               <div class="hero-grade-score">${avg}/100</div>
@@ -1474,6 +1582,7 @@
         createSparkline('chart-hero-grade', avgTrend, avg);
       }, 0);
     } else if (current.type === 'sub-team') {
+      const ownership = getOwnershipInfo();
       // Show specific sub-team grade (leaf node - hero only)
       const subTeam = current.data;
       const subTeamName = current.teamName;
@@ -1497,6 +1606,7 @@
         <div class="hero-section-wrapper">
           <div class="hero-section">
             <div class="hero-grade">
+              ${renderOwnershipHtml(ownership)}
               <div class="hero-grade-title">${subTeamName}</div>
               <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
               <div class="hero-grade-score">${avg}/100</div>
