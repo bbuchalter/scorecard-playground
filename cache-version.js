@@ -4,6 +4,10 @@
 (function() {
   // ==========================================
   // BUMP THIS VERSION TO CLEAR USER CACHES
+  // Also update ?v= query strings in HTML files:
+  //   - dashboard.html
+  //   - index.html
+  //   - data-editor.html
   // ==========================================
   const CACHE_VERSION = '1.0.3';
   
