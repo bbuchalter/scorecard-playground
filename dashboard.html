@@ -46,6 +46,20 @@
 
     .header {
       margin-bottom: 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+    }
+
+    .header-left {
+      flex: 1;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      padding-top: 4px;
     }
 
     .title {
@@ -575,12 +589,6 @@
       padding: 16px 0;
     }
 
-    .hero-actions {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-    }
-
     .hero-section-wrapper {
       margin-bottom: 30px;
     }
@@ -624,13 +632,102 @@
     .trend-chart-canvas {
       height: 250px;
     }
+
+    /* Sub-team page layout: hero-grade + metrics trend stacked on left */
+    .hero-section-subteam {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .hero-section-subteam {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .hero-left-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .hero-grade-compact {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(255,255,255,.03);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      position: relative;
+    }
+
+    .hero-grade-compact .hero-grade-title {
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .hero-grade-compact .hero-grade-badge {
+      font-size: 48px;
+      width: 90px;
+      height: 90px;
+      border-radius: 16px;
+      margin-bottom: 8px;
+    }
+
+    .hero-grade-compact .hero-grade-score {
+      font-size: 22px;
+    }
+
+    .hero-grade-compact .hero-sparkline-container {
+      width: 140px;
+      height: 40px;
+      margin-top: 8px;
+    }
+
+    .hero-grade-compact .ownership-info {
+      font-size: 9px;
+      max-width: 120px;
+    }
+
+    .hero-grade-compact .ownership-role {
+      font-size: 8px;
+    }
+
+    .trend-chart-inline {
+      flex: 1;
+      background: rgba(255,255,255,.03);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .trend-chart-inline .trend-chart-title {
+      font-size: 11px;
+      margin-bottom: 10px;
+    }
+
+    .trend-chart-inline .trend-chart-canvas {
+      flex: 1;
+      min-height: 120px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1 class="title">Company Scorecards</h1>
-      <div class="breadcrumb" id="breadcrumb"></div>
+      <div class="header-left">
+        <h1 class="title">Company Scorecards</h1>
+        <div class="breadcrumb" id="breadcrumb"></div>
+      </div>
+      <div class="header-actions">
+        <a href="#" id="configLink" class="data-editor-link">⚙️ Scorecard Config</a>
+        <a href="data-editor.html" class="data-editor-link">✏️ Data Editor</a>
+      </div>
     </div>
 
     <div id="heroGradeContainer"></div>
@@ -1625,17 +1722,11 @@
               <div class="hero-sparkline-container">
                 <canvas id="chart-hero-grade"></canvas>
               </div>
-              <div class="hero-actions">
-                <a href="${getConfigUrl()}" class="data-editor-link">⚙️ Scorecard Config</a>
-              </div>
             </div>
             <div class="priority-work-panel">
               <h3 class="priority-work-title">Top 5 Opportunities</h3>
               <div class="priority-work-items">
                 ${renderPriorityWork()}
-              </div>
-              <div class="hero-actions">
-                <a href="data-editor.html" class="data-editor-link">✏️ Data Editor</a>
               </div>
             </div>
           </div>
@@ -1666,17 +1757,11 @@
               <div class="hero-sparkline-container">
                 <canvas id="chart-hero-grade"></canvas>
               </div>
-              <div class="hero-actions">
-                <a href="${getConfigUrl()}" class="data-editor-link">⚙️ Scorecard Config</a>
-              </div>
             </div>
             <div class="priority-work-panel">
               <h3 class="priority-work-title">Top 5 Opportunities</h3>
               <div class="priority-work-items">
                 ${renderPriorityWork()}
-              </div>
-              <div class="hero-actions">
-                <a href="data-editor.html" class="data-editor-link">✏️ Data Editor</a>
               </div>
             </div>
           </div>
@@ -1719,17 +1804,11 @@
               <div class="hero-sparkline-container">
                 <canvas id="chart-hero-grade"></canvas>
               </div>
-              <div class="hero-actions">
-                <a href="${getConfigUrl()}" class="data-editor-link">⚙️ Scorecard Config</a>
-              </div>
             </div>
             <div class="priority-work-panel">
               <h3 class="priority-work-title">Top 5 Opportunities</h3>
               <div class="priority-work-items">
                 ${renderPriorityWork()}
-              </div>
-              <div class="hero-actions">
-                <a href="data-editor.html" class="data-editor-link">✏️ Data Editor</a>
               </div>
             </div>
           </div>
@@ -1760,20 +1839,23 @@
       
       const avgClass = getScoreClass(avg);
       const letterGrade = getLetterGrade(avg);
+      const safeId = subTeamName.replace(/[^a-zA-Z0-9]/g, '-');
       
       container.innerHTML = `
         <div class="hero-section-wrapper">
-          <div class="hero-section">
-            <div class="hero-grade">
-              ${renderOwnershipHtml(ownership)}
-              <div class="hero-grade-title">${subTeamName}</div>
-              <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
-              <div class="hero-grade-score">${avg}/100</div>
-              <div class="hero-sparkline-container">
-                <canvas id="chart-hero-grade"></canvas>
+          <div class="hero-section-subteam">
+            <div class="hero-left-column">
+              <div class="hero-grade-compact">
+                ${renderOwnershipHtml(ownership)}
+                <div class="hero-grade-title">${subTeamName}</div>
+                <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
+                <div class="hero-grade-score">${avg}/100</div>
               </div>
-              <div class="hero-actions">
-                <a href="${getConfigUrl()}" class="data-editor-link">⚙️ Scorecard Config</a>
+              <div class="trend-chart-inline">
+                <div class="trend-chart-title">Metrics Trend</div>
+                <div class="trend-chart-canvas">
+                  <canvas id="chart-trend-${safeId}"></canvas>
+                </div>
               </div>
             </div>
             <div class="priority-work-panel">
@@ -1781,17 +1863,14 @@
               <div class="priority-work-items">
                 ${renderPriorityWork()}
               </div>
-              <div class="hero-actions">
-                <a href="data-editor.html" class="data-editor-link">✏️ Data Editor</a>
-              </div>
             </div>
           </div>
         </div>
       `;
       
-      // Create hero sparkline
+      // Create trend chart
       setTimeout(() => {
-        createSparkline('chart-hero-grade', avgTrend, avg);
+        createFullLineChart(`chart-trend-${safeId}`, metrics);
       }, 0);
     }
   }
@@ -2042,13 +2121,19 @@
     // Sanitize teamName for use in canvas IDs (replace spaces and special chars)
     const safeId = teamName.replace(/[^a-zA-Z0-9]/g, '-');
 
-    const html = `
+    // On sub-team pages (navigationPath.length === 3), the trend chart is in the hero section
+    const isSubTeamPage = navigationPath.length === 3;
+    const trendChartHtml = isSubTeamPage ? '' : `
       <div class="trend-chart-container">
         <div class="trend-chart-title">Metrics Trend</div>
         <div class="trend-chart-canvas">
           <canvas id="chart-trend-${safeId}"></canvas>
         </div>
       </div>
+    `;
+
+    const html = `
+      ${trendChartHtml}
       <div class="scorecard-table">
         <table>
           <thead>
@@ -2111,9 +2196,11 @@
 
     document.getElementById('tableContainer').innerHTML = html;
 
-    // Create trend chart and sparklines
+    // Create trend chart (only if not on sub-team page) and sparklines
     setTimeout(() => {
-      createFullLineChart(`chart-trend-${safeId}`, metrics);
+      if (!isSubTeamPage) {
+        createFullLineChart(`chart-trend-${safeId}`, metrics);
+      }
       createSparkline(`chart-single-${safeId}-grade`, avgTrend, avg);
       createSparkline(`chart-single-${safeId}-slos`, metrics.slos.trend, metrics.slos.score);
       createSparkline(`chart-single-${safeId}-vulns`, metrics.vulns.trend, metrics.vulns.score);
@@ -2122,8 +2209,17 @@
     }, 0);
   }
 
+  function updateHeaderButtons() {
+    // Update the config link based on current navigation path
+    const configLink = document.getElementById('configLink');
+    if (configLink) {
+      configLink.href = getConfigUrl();
+    }
+  }
+
   function render() {
     renderBreadcrumb();
+    updateHeaderButtons();
     renderHeroGrade();
     
     if (navigationPath.length === 0) {
