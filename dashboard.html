@@ -603,6 +603,27 @@
       background: rgba(147,197,253,.20);
       border-color: rgba(147,197,253,.40);
     }
+
+    .trend-chart-container {
+      background: rgba(255,255,255,.03);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 24px;
+      margin-bottom: 30px;
+    }
+
+    .trend-chart-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+
+    .trend-chart-canvas {
+      height: 250px;
+    }
   </style>
 </head>
 <body>
@@ -1117,6 +1138,144 @@
           line: {
             borderWidth: 2
           }
+        }
+      }
+    });
+  }
+
+  function createFullLineChart(canvasId, metrics) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+
+    // Destroy existing chart if it exists
+    if (chartInstances[canvasId]) {
+      chartInstances[canvasId].destroy();
+    }
+
+    chartInstances[canvasId] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['Q-3', 'Q-2', 'Q-1', 'Current'],
+        datasets: [
+          {
+            label: 'SLOs',
+            data: metrics.slos.trend,
+            borderColor: '#93c5fd',
+            backgroundColor: 'rgba(147, 197, 253, 0.1)',
+            borderWidth: 2,
+            pointRadius: 4,
+            pointBackgroundColor: '#93c5fd',
+            pointBorderColor: '#93c5fd',
+            tension: 0.3
+          },
+          {
+            label: 'Vulns',
+            data: metrics.vulns.trend,
+            borderColor: '#fb7185',
+            backgroundColor: 'rgba(251, 113, 133, 0.1)',
+            borderWidth: 2,
+            pointRadius: 4,
+            pointBackgroundColor: '#fb7185',
+            pointBorderColor: '#fb7185',
+            tension: 0.3
+          },
+          {
+            label: 'Bugs',
+            data: metrics.bugs.trend,
+            borderColor: '#fde68a',
+            backgroundColor: 'rgba(253, 230, 138, 0.1)',
+            borderWidth: 2,
+            pointRadius: 4,
+            pointBackgroundColor: '#fde68a',
+            pointBorderColor: '#fde68a',
+            tension: 0.3
+          },
+          {
+            label: 'Postmortems',
+            data: metrics.postmortems.trend,
+            borderColor: '#c4b5fd',
+            backgroundColor: 'rgba(196, 181, 253, 0.1)',
+            borderWidth: 2,
+            pointRadius: 4,
+            pointBackgroundColor: '#c4b5fd',
+            pointBorderColor: '#c4b5fd',
+            tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: '#e9eefc',
+              font: {
+                size: 12,
+                weight: '600'
+              },
+              padding: 15,
+              usePointStyle: true,
+              pointStyle: 'circle'
+            }
+          },
+          tooltip: {
+            enabled: true,
+            mode: 'index',
+            intersect: false,
+            backgroundColor: 'rgba(17, 25, 53, 0.95)',
+            titleColor: '#e9eefc',
+            bodyColor: '#e9eefc',
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            borderWidth: 1,
+            padding: 12,
+            displayColors: true,
+            callbacks: {
+              label: function(context) {
+                return context.dataset.label + ': ' + context.parsed.y;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            display: true,
+            grid: {
+              display: false,
+              color: 'rgba(255, 255, 255, 0.1)'
+            },
+            ticks: {
+              color: '#a9b4d6',
+              font: {
+                size: 11
+              }
+            }
+          },
+          y: {
+            display: true,
+            min: 0,
+            max: 100,
+            grid: {
+              color: 'rgba(255, 255, 255, 0.05)',
+              borderDash: [3, 3]
+            },
+            ticks: {
+              color: '#a9b4d6',
+              font: {
+                size: 11
+              },
+              callback: function(value) {
+                return value;
+              }
+            }
+          }
+        },
+        interaction: {
+          mode: 'nearest',
+          axis: 'x',
+          intersect: false
         }
       }
     });
@@ -1884,6 +2043,12 @@
     const safeId = teamName.replace(/[^a-zA-Z0-9]/g, '-');
 
     const html = `
+      <div class="trend-chart-container">
+        <div class="trend-chart-title">Metrics Trend</div>
+        <div class="trend-chart-canvas">
+          <canvas id="chart-trend-${safeId}"></canvas>
+        </div>
+      </div>
       <div class="scorecard-table">
         <table>
           <thead>
@@ -1946,8 +2111,9 @@
 
     document.getElementById('tableContainer').innerHTML = html;
 
-    // Create sparklines
+    // Create trend chart and sparklines
     setTimeout(() => {
+      createFullLineChart(`chart-trend-${safeId}`, metrics);
       createSparkline(`chart-single-${safeId}-grade`, avgTrend, avg);
       createSparkline(`chart-single-${safeId}-slos`, metrics.slos.trend, metrics.slos.score);
       createSparkline(`chart-single-${safeId}-vulns`, metrics.vulns.trend, metrics.vulns.score);
