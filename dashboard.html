@@ -1415,68 +1415,38 @@
     const letterGrade = getLetterGrade(avg);
     const safeId = currentNode.name.replace(/[^a-zA-Z0-9]/g, '-');
     
-    // Leaf nodes show inline trend chart, non-leaf show sparkline
-    if (currentNode.isLeaf) {
-      container.innerHTML = `
-        <div class="hero-section-wrapper">
-          <div class="hero-section-subteam">
-            <div class="hero-left-column">
-              <div class="hero-grade-compact">
-                ${renderOwnershipHtml(ownership)}
-                <div class="hero-grade-title">${escapeHtml(currentNode.name)}</div>
-                <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
-                <div class="hero-grade-score">${avg}/100</div>
-              </div>
-              <div class="trend-chart-inline">
-                <div class="trend-chart-title">Metrics Trend</div>
-                <div class="trend-chart-canvas">
-                  <canvas id="chart-trend-${safeId}"></canvas>
-                </div>
-              </div>
-            </div>
-            <div class="priority-work-panel">
-              <h3 class="priority-work-title">Top 5 Opportunities</h3>
-              <div class="priority-work-items">
-                ${renderPriorityWork()}
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      // Create full trend chart for leaf
-      setTimeout(() => {
-        createFullLineChart(`chart-trend-${safeId}`, currentNode.metrics);
-      }, 0);
-    } else {
-      // Non-leaf: standard hero with sparkline
-      container.innerHTML = `
-        <div class="hero-section-wrapper">
-          <div class="hero-section">
-            <div class="hero-grade">
+    // Always show inline metrics trend chart for consistency
+    container.innerHTML = `
+      <div class="hero-section-wrapper">
+        <div class="hero-section-subteam">
+          <div class="hero-left-column">
+            <div class="hero-grade-compact">
               ${renderOwnershipHtml(ownership)}
               <div class="hero-grade-title">${escapeHtml(currentNode.name)}</div>
               <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
               <div class="hero-grade-score">${avg}/100</div>
-              <div class="hero-sparkline-container">
-                <canvas id="chart-hero-grade"></canvas>
-              </div>
             </div>
-            <div class="priority-work-panel">
-              <h3 class="priority-work-title">Top 5 Opportunities</h3>
-              <div class="priority-work-items">
-                ${renderPriorityWork()}
+            <div class="trend-chart-inline">
+              <div class="trend-chart-title">Metrics Trend</div>
+              <div class="trend-chart-canvas">
+                <canvas id="chart-trend-${safeId}"></canvas>
               </div>
             </div>
           </div>
+          <div class="priority-work-panel">
+            <h3 class="priority-work-title">Top 5 Opportunities</h3>
+            <div class="priority-work-items">
+              ${renderPriorityWork()}
+            </div>
+          </div>
         </div>
-      `;
-      
-      // Create hero sparkline
-      setTimeout(() => {
-        createSparkline('chart-hero-grade', trend, avg);
-      }, 0);
-    }
+      </div>
+    `;
+    
+    // Create full trend chart
+    setTimeout(() => {
+      createFullLineChart(`chart-trend-${safeId}`, currentNode.metrics);
+    }, 0);
   }
 
 
