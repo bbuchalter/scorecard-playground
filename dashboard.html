@@ -1725,6 +1725,8 @@
       // Update URL and localStorage via TeamNavigation
       TeamNavigation.navigateTo(path, null);
       render();
+      // Scroll to top to show new content
+      window.scrollTo(0, 0);
     }
   }
 
