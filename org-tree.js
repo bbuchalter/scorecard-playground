@@ -12,7 +12,7 @@
  * @param {Object} compute - Compute module
  * @returns {OrgNode} - Root node of the organization tree
  */
-function buildOrgTree(mockData, hierarchy, config, normMethods, compute) {
+function buildOrgTree(mockData, hierarchy, config, normMethods, compute, rootOwnership) {
   // Create root R&D node
   const rootNode = {
     name: 'R&D',
@@ -21,7 +21,8 @@ function buildOrgTree(mockData, hierarchy, config, normMethods, compute) {
     isLeaf: false,
     children: [],
     metrics: null,
-    rawData: null
+    rawData: null,
+    ownership: rootOwnership || null
   };
 
   // Build children (groups)
@@ -36,7 +37,8 @@ function buildOrgTree(mockData, hierarchy, config, normMethods, compute) {
       isLeaf: false,
       children: [],
       metrics: null,
-      rawData: null
+      rawData: null,
+      ownership: groupHierarchy.ownership || null
     };
 
     // Build group's children (teams)
@@ -53,7 +55,8 @@ function buildOrgTree(mockData, hierarchy, config, normMethods, compute) {
           isLeaf: false,
           children: [],
           metrics: null,
-          rawData: null
+          rawData: null,
+          ownership: teamHierarchy.ownership || null
         };
 
         // Build team's children (sub-teams)
@@ -327,22 +330,12 @@ function calculateAverageTrend(node) {
 
 /**
  * Get ownership info for a node
- * Uses the node's ownership if it's a leaf, or the first leaf descendant's ownership otherwise
+ * Returns the node's own ownership
  * @param {OrgNode} node - Node to get ownership for
  * @returns {Object|null} - Ownership object or null
  */
 function getNodeOwnership(node) {
-  if (node.isLeaf && node.ownership) {
-    return node.ownership;
-  }
-  
-  // For non-leaf nodes (including root), get ownership from first leaf descendant
-  const leaves = getAllLeafNodes(node);
-  if (leaves.length > 0 && leaves[0].ownership) {
-    return leaves[0].ownership;
-  }
-  
-  return null;
+  return node.ownership || null;
 }
 
 /**

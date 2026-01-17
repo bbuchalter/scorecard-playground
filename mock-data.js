@@ -5,9 +5,17 @@ const MOCK_DATA_KEY = "scorecard-mock-data";
 
 // Organization hierarchy - matches dashboard.html
 // Each leaf team has fixed ownership information
+// Root-level ownership for R&D
+const rootOwnership = {
+  engineeringManager: 'Victoria Sterling',
+  productManager: 'Marcus Webb',
+  reliabilityDRI: 'Elena Vasquez'
+};
+
 const organizationHierarchy = {
   'Applications': {
     name: 'Applications',
+    ownership: { engineeringManager: 'Jonathan Blake', productManager: 'Rebecca Foster', reliabilityDRI: 'Derek Chang' },
     teams: {
       'Frontend': { 
         name: 'Frontend',
@@ -15,6 +23,7 @@ const organizationHierarchy = {
       },
       'Backend API': {
         name: 'Backend API',
+        ownership: { engineeringManager: 'Nathan Cross', productManager: 'Diana Reyes', reliabilityDRI: 'Adrian Cole' },
         subTeams: {
           'API Gateway': { 
             name: 'API Gateway',
@@ -42,9 +51,11 @@ const organizationHierarchy = {
   },
   'Infrastructure': {
     name: 'Infrastructure',
+    ownership: { engineeringManager: 'Gregory Thornton', productManager: 'Alicia Monroe', reliabilityDRI: 'Felix Huang' },
     teams: {
       'Cloud Platform': {
         name: 'Cloud Platform',
+        ownership: { engineeringManager: 'Kenneth Pearson', productManager: 'Jasmine Okonkwo', reliabilityDRI: 'Liam Fitzgerald' },
         subTeams: {
           'AWS Infrastructure': { 
             name: 'AWS Infrastructure',
@@ -80,6 +91,7 @@ const organizationHierarchy = {
   },
   'Growth': {
     name: 'Growth',
+    ownership: { engineeringManager: 'Samantha Pierce', productManager: 'Brandon Hayes', reliabilityDRI: 'Nadia Kuznetsova' },
     teams: {
       'Marketing Automation': { 
         name: 'Marketing Automation',
@@ -101,6 +113,7 @@ const organizationHierarchy = {
   },
   'Platform': {
     name: 'Platform',
+    ownership: { engineeringManager: 'Douglas Freeman', productManager: 'Cynthia Morales', reliabilityDRI: 'Ivan Petrov' },
     teams: {
       'API Gateway': { 
         name: 'API Gateway',
@@ -122,6 +135,7 @@ const organizationHierarchy = {
   },
   'Data Engineering': {
     name: 'Data Engineering',
+    ownership: { engineeringManager: 'Howard Lin', productManager: 'Melissa Crawford', reliabilityDRI: 'Tanya Volkov' },
     teams: {
       'ETL Pipeline': { 
         name: 'ETL Pipeline',
@@ -143,6 +157,7 @@ const organizationHierarchy = {
   },
   'Mobile': {
     name: 'Mobile',
+    ownership: { engineeringManager: 'Raymond Burke', productManager: 'Angela Simmons', reliabilityDRI: 'Oscar Delgado' },
     teams: {
       'iOS': { 
         name: 'iOS',
@@ -473,6 +488,7 @@ function getOrGenerateOwnership(teamData) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     organizationHierarchy,
+    rootOwnership,
     generateTeamData,
     generateAllMockData,
     loadMockData,
@@ -489,6 +505,7 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
   window.MockData = {
     organizationHierarchy,
+    rootOwnership,
     generateTeamData,
     generateAllMockData,
     loadMockData,

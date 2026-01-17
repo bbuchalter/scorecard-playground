@@ -5,7 +5,7 @@
   // ==========================================
   // BUMP THIS VERSION TO CLEAR USER CACHES
   // ==========================================
-  const CACHE_VERSION = '1.0.2';
+  const CACHE_VERSION = '1.0.3';
   
   const VERSION_KEY = 'scorecard-cache-version';
   

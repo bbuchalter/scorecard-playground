@@ -426,6 +426,20 @@
       text-overflow: ellipsis;
     }
 
+    .ownership-name-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .owner-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      object-fit: cover;
+    }
+
     .hero-grade-badge {
       font-size: 80px;
       font-weight: 900;
@@ -950,7 +964,8 @@
     window.MockData.organizationHierarchy,
     config,
     normMethods,
-    compute
+    compute,
+    window.MockData.rootOwnership
   );
 
   // Original hardcoded data structure preserved for reference:
@@ -1491,6 +1506,13 @@
     return div.innerHTML;
   }
 
+  // Get avatar URL using i.pravatar.cc (photo-realistic faces)
+  // The 'u' parameter seeds the image so the same name always gets the same photo
+  function getAvatarUrl(name, size = 24) {
+    const seed = encodeURIComponent(name);
+    return `https://i.pravatar.cc/${size}?u=${seed}`;
+  }
+
   function getConfigUrl() {
     if (currentNode.path.length === 0) {
       return 'index.html';
@@ -1512,15 +1534,24 @@
         <div class="ownership-info">
           <div class="ownership-row">
             <span class="ownership-role">Engineering Manager</span>
-            <span class="ownership-name">${escapeHtml(ownership.engineeringManager)}</span>
+            <div class="ownership-name-row">
+              <img src="${getAvatarUrl(ownership.engineeringManager)}" alt="" class="owner-avatar">
+              <span class="ownership-name">${escapeHtml(ownership.engineeringManager)}</span>
+            </div>
           </div>
           <div class="ownership-row">
             <span class="ownership-role">Product Manager</span>
-            <span class="ownership-name">${escapeHtml(ownership.productManager)}</span>
+            <div class="ownership-name-row">
+              <img src="${getAvatarUrl(ownership.productManager)}" alt="" class="owner-avatar">
+              <span class="ownership-name">${escapeHtml(ownership.productManager)}</span>
+            </div>
           </div>
           <div class="ownership-row">
             <span class="ownership-role">Reliability DRI</span>
-            <span class="ownership-name">${escapeHtml(ownership.reliabilityDRI)}</span>
+            <div class="ownership-name-row">
+              <img src="${getAvatarUrl(ownership.reliabilityDRI)}" alt="" class="owner-avatar">
+              <span class="ownership-name">${escapeHtml(ownership.reliabilityDRI)}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1710,6 +1741,7 @@
                 ${renderOwnershipPanel(ownership)}
               </div>
               <div class="hero-metrics-panel">
+                <h3 class="priority-work-title">Scorecard Breakdown</h3>
                 <div class="hero-metrics-bars">
                   ${renderMetricBars(currentNode.metrics)}
                 </div>
