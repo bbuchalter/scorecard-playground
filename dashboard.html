@@ -396,16 +396,28 @@
       position: relative;
     }
 
-    .ownership-info {
+    .hero-top-left {
       position: absolute;
       top: 12px;
       left: 12px;
       display: flex;
       flex-direction: column;
+      gap: 8px;
+      max-width: 180px;
+    }
+
+    .hero-grade-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .ownership-info {
+      display: flex;
+      flex-direction: column;
       gap: 4px;
       font-size: 11px;
       color: var(--muted);
-      max-width: 160px;
     }
 
     .ownership-row {
@@ -427,15 +439,6 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-
-    .hero-grade-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--muted);
-      margin-bottom: 20px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
     }
 
     .hero-grade-badge {
@@ -655,6 +658,18 @@
       gap: 20px;
     }
 
+    .hero-top-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 600px) {
+      .hero-top-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .hero-grade-compact {
       display: flex;
       flex-direction: column;
@@ -667,9 +682,14 @@
       position: relative;
     }
 
-    .hero-grade-compact .hero-grade-title {
-      font-size: 14px;
-      margin-bottom: 12px;
+    .hero-metrics-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(255,255,255,.03);
+      border-radius: 16px;
+      border: 1px solid var(--border);
     }
 
     .hero-grade-compact .hero-grade-badge {
@@ -697,21 +717,6 @@
 
     .hero-grade-compact .ownership-role {
       font-size: 8px;
-    }
-
-    /* Hero grade layout with metrics */
-    .hero-grade-content {
-      display: flex;
-      align-items: center;
-      gap: 40px;
-      width: 100%;
-      justify-content: center;
-    }
-
-    .hero-grade-left {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
     }
 
     .hero-metrics-bars {
@@ -1502,9 +1507,8 @@
     return OrgTree.getNodeOwnership(currentNode);
   }
 
-  function renderOwnershipHtml(ownership) {
-    if (!ownership) return '';
-    return `
+  function renderTopLeftHtml(name, ownership) {
+    const ownershipHtml = ownership ? `
       <div class="ownership-info">
         <div class="ownership-row">
           <span class="ownership-role">Engineering Manager</span>
@@ -1518,6 +1522,13 @@
           <span class="ownership-role">Reliability DRI</span>
           <span class="ownership-name">${escapeHtml(ownership.reliabilityDRI)}</span>
         </div>
+      </div>
+    ` : '';
+    
+    return `
+      <div class="hero-top-left">
+        <div class="hero-grade-title">${escapeHtml(name)}</div>
+        ${ownershipHtml}
       </div>
     `;
   }
@@ -1616,7 +1627,7 @@
     const path = currentNode.path;
     
     if (path.length === 0) {
-      breadcrumbEl.innerHTML = '<span class="breadcrumb-current">R&D Groups</span>';
+      breadcrumbEl.innerHTML = '<span class="breadcrumb-current">R&D</span>';
       return;
     }
     
@@ -1667,42 +1678,41 @@
       <div class="hero-section-wrapper">
         <div class="hero-section-subteam">
           <div class="hero-left-column">
-            <div class="hero-grade-compact">
-              ${renderOwnershipHtml(ownership)}
-              <div class="hero-grade-title">${escapeHtml(currentNode.name)}</div>
-              <div class="hero-grade-content">
-                <div class="hero-grade-left">
-                  <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
-                  <div class="grade-tooltip-wrapper">
-                    <div class="hero-grade-score">${Math.round(earnedScore)}/${totalBudget}</div>
-                    <div class="grade-info-icon">?</div>
-                    <div class="grade-tooltip">
-                      <div class="grade-tooltip-title">Score to Grade</div>
-                      <div class="grade-tooltip-scale">
-                        <div class="grade-tooltip-row">
-                          <span class="grade-tooltip-letter grade-a">A</span>
-                          <span class="grade-tooltip-range">90 – 100</span>
-                        </div>
-                        <div class="grade-tooltip-row">
-                          <span class="grade-tooltip-letter grade-b">B</span>
-                          <span class="grade-tooltip-range">80 – 89</span>
-                        </div>
-                        <div class="grade-tooltip-row">
-                          <span class="grade-tooltip-letter grade-c">C</span>
-                          <span class="grade-tooltip-range">70 – 79</span>
-                        </div>
-                        <div class="grade-tooltip-row">
-                          <span class="grade-tooltip-letter grade-d">D</span>
-                          <span class="grade-tooltip-range">60 – 69</span>
-                        </div>
-                        <div class="grade-tooltip-row">
-                          <span class="grade-tooltip-letter grade-f">F</span>
-                          <span class="grade-tooltip-range">0 – 59</span>
-                        </div>
+            <div class="hero-top-row">
+              <div class="hero-grade-compact">
+                ${renderTopLeftHtml(currentNode.name, ownership)}
+                <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
+                <div class="grade-tooltip-wrapper">
+                  <div class="hero-grade-score">${Math.round(earnedScore)}/${totalBudget}</div>
+                  <div class="grade-info-icon">?</div>
+                  <div class="grade-tooltip">
+                    <div class="grade-tooltip-title">Score to Grade</div>
+                    <div class="grade-tooltip-scale">
+                      <div class="grade-tooltip-row">
+                        <span class="grade-tooltip-letter grade-a">A</span>
+                        <span class="grade-tooltip-range">90 – 100</span>
+                      </div>
+                      <div class="grade-tooltip-row">
+                        <span class="grade-tooltip-letter grade-b">B</span>
+                        <span class="grade-tooltip-range">80 – 89</span>
+                      </div>
+                      <div class="grade-tooltip-row">
+                        <span class="grade-tooltip-letter grade-c">C</span>
+                        <span class="grade-tooltip-range">70 – 79</span>
+                      </div>
+                      <div class="grade-tooltip-row">
+                        <span class="grade-tooltip-letter grade-d">D</span>
+                        <span class="grade-tooltip-range">60 – 69</span>
+                      </div>
+                      <div class="grade-tooltip-row">
+                        <span class="grade-tooltip-letter grade-f">F</span>
+                        <span class="grade-tooltip-range">0 – 59</span>
                       </div>
                     </div>
                   </div>
                 </div>
+              </div>
+              <div class="hero-metrics-panel">
                 <div class="hero-metrics-bars">
                   ${renderMetricBars(currentNode.metrics)}
                 </div>
