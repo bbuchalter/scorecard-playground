@@ -699,6 +699,99 @@
       font-size: 8px;
     }
 
+    /* Hero grade layout with metrics */
+    .hero-grade-content {
+      display: flex;
+      align-items: center;
+      gap: 40px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .hero-grade-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .hero-metrics-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 180px;
+    }
+
+    .metric-bar-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .metric-bar-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .metric-bar-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .metric-bar-dot.slos { background: #93c5fd; }
+    .metric-bar-dot.vulns { background: #fb7185; }
+    .metric-bar-dot.bugs { background: #fde68a; }
+    .metric-bar-dot.postmortems { background: #c4b5fd; }
+
+    .metric-bar-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      flex: 1;
+    }
+
+    .metric-bar-pct {
+      font-family: ui-monospace, monospace;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .metric-bar-pct.excellent { color: var(--excellent); }
+    .metric-bar-pct.good { color: var(--good); }
+    .metric-bar-pct.fair { color: var(--fair); }
+    .metric-bar-pct.at-risk { color: var(--at-risk); }
+    .metric-bar-pct.critical { color: var(--critical); }
+
+    .metric-bar-score {
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      color: var(--muted);
+      padding-left: 16px;
+      margin-bottom: 4px;
+    }
+
+    .metric-bar-track {
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255,255,255,.08);
+      overflow: hidden;
+      margin-left: 16px;
+    }
+
+    .metric-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width .3s ease;
+    }
+
+    .metric-bar-fill.excellent { background: var(--excellent); }
+    .metric-bar-fill.good { background: var(--good); }
+    .metric-bar-fill.fair { background: var(--fair); }
+    .metric-bar-fill.at-risk { background: var(--at-risk); }
+    .metric-bar-fill.critical { background: var(--critical); }
+
     /* Grade tooltip */
     .grade-tooltip-wrapper {
       position: relative;
@@ -1406,7 +1499,7 @@
 
   // Get ownership info for the current node
   function getOwnershipInfo() {
-    return OrgTree.getNodeOwnership(currentNode, window.MockData.getOrGenerateOwnership);
+    return OrgTree.getNodeOwnership(currentNode);
   }
 
   function renderOwnershipHtml(ownership) {
@@ -1427,6 +1520,47 @@
         </div>
       </div>
     `;
+  }
+
+  function renderMetricBars(metrics) {
+    // Get budget allocations from scorecard configuration
+    const budgets = {
+      slos: config.slo.pointBudget,
+      vulns: config.vuln.budget,
+      bugs: config.bug.budget,
+      postmortems: config.pm.budget
+    };
+
+    const metricConfigs = [
+      { key: 'slos', name: 'SLOs', dotClass: 'slos' },
+      { key: 'vulns', name: 'Vulns', dotClass: 'vulns' },
+      { key: 'bugs', name: 'Bugs', dotClass: 'bugs' },
+      { key: 'postmortems', name: 'Postmortems', dotClass: 'postmortems' }
+    ];
+
+    return metricConfigs.map(cfg => {
+      const metric = metrics[cfg.key];
+      const score = metric.score;
+      const maxBudget = budgets[cfg.key];
+      const scoreClass = getScoreClass(score);
+      // Calculate contribution: score (0-100) as percentage of this metric's budget
+      const contribution = (score / 100) * maxBudget;
+      const pct = score;
+      
+      return `
+        <div class="metric-bar-row">
+          <div class="metric-bar-header">
+            <span class="metric-bar-dot ${cfg.dotClass}"></span>
+            <span class="metric-bar-name">${cfg.name}</span>
+            <span class="metric-bar-pct ${scoreClass}">${Math.round(pct)}%</span>
+          </div>
+          <div class="metric-bar-score">${contribution.toFixed(1)} / ${maxBudget}</div>
+          <div class="metric-bar-track">
+            <div class="metric-bar-fill ${scoreClass}" style="width: ${pct}%;"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 
   function calculatePriorityWork() {
@@ -1519,6 +1653,15 @@
     const letterGrade = getLetterGrade(avg);
     const safeId = currentNode.name.replace(/[^a-zA-Z0-9]/g, '-');
     
+    // Calculate total budget and earned score from config
+    const totalBudget = config.slo.pointBudget + config.vuln.budget + config.bug.budget + config.pm.budget;
+    const metrics = currentNode.metrics;
+    const earnedScore = 
+      (metrics.slos.score / 100) * config.slo.pointBudget +
+      (metrics.vulns.score / 100) * config.vuln.budget +
+      (metrics.bugs.score / 100) * config.bug.budget +
+      (metrics.postmortems.score / 100) * config.pm.budget;
+    
     // Always show inline metrics trend chart for consistency
     container.innerHTML = `
       <div class="hero-section-wrapper">
@@ -1527,34 +1670,41 @@
             <div class="hero-grade-compact">
               ${renderOwnershipHtml(ownership)}
               <div class="hero-grade-title">${escapeHtml(currentNode.name)}</div>
-              <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
-              <div class="grade-tooltip-wrapper">
-                <div class="hero-grade-score">${avg}/100</div>
-                <div class="grade-info-icon">?</div>
-                <div class="grade-tooltip">
-                  <div class="grade-tooltip-title">Score to Grade</div>
-                  <div class="grade-tooltip-scale">
-                    <div class="grade-tooltip-row">
-                      <span class="grade-tooltip-letter grade-a">A</span>
-                      <span class="grade-tooltip-range">90 – 100</span>
-                    </div>
-                    <div class="grade-tooltip-row">
-                      <span class="grade-tooltip-letter grade-b">B</span>
-                      <span class="grade-tooltip-range">80 – 89</span>
-                    </div>
-                    <div class="grade-tooltip-row">
-                      <span class="grade-tooltip-letter grade-c">C</span>
-                      <span class="grade-tooltip-range">70 – 79</span>
-                    </div>
-                    <div class="grade-tooltip-row">
-                      <span class="grade-tooltip-letter grade-d">D</span>
-                      <span class="grade-tooltip-range">60 – 69</span>
-                    </div>
-                    <div class="grade-tooltip-row">
-                      <span class="grade-tooltip-letter grade-f">F</span>
-                      <span class="grade-tooltip-range">0 – 59</span>
+              <div class="hero-grade-content">
+                <div class="hero-grade-left">
+                  <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
+                  <div class="grade-tooltip-wrapper">
+                    <div class="hero-grade-score">${Math.round(earnedScore)}/${totalBudget}</div>
+                    <div class="grade-info-icon">?</div>
+                    <div class="grade-tooltip">
+                      <div class="grade-tooltip-title">Score to Grade</div>
+                      <div class="grade-tooltip-scale">
+                        <div class="grade-tooltip-row">
+                          <span class="grade-tooltip-letter grade-a">A</span>
+                          <span class="grade-tooltip-range">90 – 100</span>
+                        </div>
+                        <div class="grade-tooltip-row">
+                          <span class="grade-tooltip-letter grade-b">B</span>
+                          <span class="grade-tooltip-range">80 – 89</span>
+                        </div>
+                        <div class="grade-tooltip-row">
+                          <span class="grade-tooltip-letter grade-c">C</span>
+                          <span class="grade-tooltip-range">70 – 79</span>
+                        </div>
+                        <div class="grade-tooltip-row">
+                          <span class="grade-tooltip-letter grade-d">D</span>
+                          <span class="grade-tooltip-range">60 – 69</span>
+                        </div>
+                        <div class="grade-tooltip-row">
+                          <span class="grade-tooltip-letter grade-f">F</span>
+                          <span class="grade-tooltip-range">0 – 59</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                </div>
+                <div class="hero-metrics-bars">
+                  ${renderMetricBars(currentNode.metrics)}
                 </div>
               </div>
             </div>

@@ -4,21 +4,40 @@
 const MOCK_DATA_KEY = "scorecard-mock-data";
 
 // Organization hierarchy - matches dashboard.html
+// Each leaf team has fixed ownership information
 const organizationHierarchy = {
   'Applications': {
     name: 'Applications',
     teams: {
-      'Frontend': { name: 'Frontend' },
+      'Frontend': { 
+        name: 'Frontend',
+        ownership: { engineeringManager: 'Sarah Chen', productManager: 'Michael Rodriguez', reliabilityDRI: 'Alex Kim' }
+      },
       'Backend API': {
         name: 'Backend API',
         subTeams: {
-          'API Gateway': { name: 'API Gateway' },
-          'Auth Service': { name: 'Auth Service' },
-          'Payment Service': { name: 'Payment Service' }
+          'API Gateway': { 
+            name: 'API Gateway',
+            ownership: { engineeringManager: 'David Patel', productManager: 'Emily Wong', reliabilityDRI: 'James Liu' }
+          },
+          'Auth Service': { 
+            name: 'Auth Service',
+            ownership: { engineeringManager: 'Maria Garcia', productManager: 'Chris Taylor', reliabilityDRI: 'Jordan Lee' }
+          },
+          'Payment Service': { 
+            name: 'Payment Service',
+            ownership: { engineeringManager: 'Robert Singh', productManager: 'Amanda Martinez', reliabilityDRI: 'Casey Brown' }
+          }
         }
       },
-      'Mobile Apps': { name: 'Mobile Apps' },
-      'Search & Discovery': { name: 'Search & Discovery' }
+      'Mobile Apps': { 
+        name: 'Mobile Apps',
+        ownership: { engineeringManager: 'Jennifer Williams', productManager: 'Daniel Kim', reliabilityDRI: 'Taylor Johnson' }
+      },
+      'Search & Discovery': { 
+        name: 'Search & Discovery',
+        ownership: { engineeringManager: 'Wei Zhang', productManager: 'Sofia Hernandez', reliabilityDRI: 'Morgan Davis' }
+      }
     }
   },
   'Infrastructure': {
@@ -27,88 +46,130 @@ const organizationHierarchy = {
       'Cloud Platform': {
         name: 'Cloud Platform',
         subTeams: {
-          'AWS Infrastructure': { name: 'AWS Infrastructure' },
-          'GCP Infrastructure': { name: 'GCP Infrastructure' },
-          'Azure Infrastructure': { name: 'Azure Infrastructure' }
+          'AWS Infrastructure': { 
+            name: 'AWS Infrastructure',
+            ownership: { engineeringManager: 'Raj Kumar', productManager: 'Nicole Anderson', reliabilityDRI: 'Drew Thompson' }
+          },
+          'GCP Infrastructure': { 
+            name: 'GCP Infrastructure',
+            ownership: { engineeringManager: 'Yuki Tanaka', productManager: 'Carlos Santos', reliabilityDRI: 'Riley Moore' }
+          },
+          'Azure Infrastructure': { 
+            name: 'Azure Infrastructure',
+            ownership: { engineeringManager: 'Omar Ali', productManager: 'Priya Sharma', reliabilityDRI: 'Quinn Wilson' }
+          }
         }
       },
-      'Networking': { name: 'Networking' },
-      'Security': { name: 'Security' },
-      'Database': { name: 'Database' },
-      'Observability': { name: 'Observability' }
+      'Networking': { 
+        name: 'Networking',
+        ownership: { engineeringManager: 'Fatima Ibrahim', productManager: 'Andrew Scott', reliabilityDRI: 'Jamie Clark' }
+      },
+      'Security': { 
+        name: 'Security',
+        ownership: { engineeringManager: 'Thomas Wright', productManager: 'Rachel Green', reliabilityDRI: 'Avery Hall' }
+      },
+      'Database': { 
+        name: 'Database',
+        ownership: { engineeringManager: 'Lisa Wang', productManager: 'Matthew Baker', reliabilityDRI: 'Cameron Young' }
+      },
+      'Observability': { 
+        name: 'Observability',
+        ownership: { engineeringManager: 'William Nguyen', productManager: 'Karen Adams', reliabilityDRI: 'Hayden King' }
+      }
     }
   },
   'Growth': {
     name: 'Growth',
     teams: {
-      'Marketing Automation': { name: 'Marketing Automation' },
-      'Analytics': { name: 'Analytics' },
-      'A/B Testing': { name: 'A/B Testing' },
-      'User Acquisition': { name: 'User Acquisition' }
+      'Marketing Automation': { 
+        name: 'Marketing Automation',
+        ownership: { engineeringManager: 'Susan Lee', productManager: 'Daniel Miller', reliabilityDRI: 'Blake Robinson' }
+      },
+      'Analytics': { 
+        name: 'Analytics',
+        ownership: { engineeringManager: 'James Chen', productManager: 'Emily Davis', reliabilityDRI: 'Skyler White' }
+      },
+      'A/B Testing': { 
+        name: 'A/B Testing',
+        ownership: { engineeringManager: 'Linda Martinez', productManager: 'Robert Johnson', reliabilityDRI: 'Reese Garcia' }
+      },
+      'User Acquisition': { 
+        name: 'User Acquisition',
+        ownership: { engineeringManager: 'Charles Kim', productManager: 'Patricia Brown', reliabilityDRI: 'Parker Lewis' }
+      }
     }
   },
   'Platform': {
     name: 'Platform',
     teams: {
-      'API Gateway': { name: 'API Gateway' },
-      'Authentication': { name: 'Authentication' },
-      'Billing': { name: 'Billing' },
-      'Notifications': { name: 'Notifications' }
+      'API Gateway': { 
+        name: 'API Gateway',
+        ownership: { engineeringManager: 'Michael Thompson', productManager: 'Sarah Williams', reliabilityDRI: 'Jesse Martin' }
+      },
+      'Authentication': { 
+        name: 'Authentication',
+        ownership: { engineeringManager: 'Jennifer Lopez', productManager: 'David Anderson', reliabilityDRI: 'Robin Taylor' }
+      },
+      'Billing': { 
+        name: 'Billing',
+        ownership: { engineeringManager: 'Christopher Moore', productManager: 'Amanda Jackson', reliabilityDRI: 'Shannon Harris' }
+      },
+      'Notifications': { 
+        name: 'Notifications',
+        ownership: { engineeringManager: 'Elizabeth White', productManager: 'Ryan Thomas', reliabilityDRI: 'Kelly Martin' }
+      }
     }
   },
   'Data Engineering': {
     name: 'Data Engineering',
     teams: {
-      'ETL Pipeline': { name: 'ETL Pipeline' },
-      'Data Warehouse': { name: 'Data Warehouse' },
-      'ML Platform': { name: 'ML Platform' },
-      'Data Quality': { name: 'Data Quality' }
+      'ETL Pipeline': { 
+        name: 'ETL Pipeline',
+        ownership: { engineeringManager: 'Richard Garcia', productManager: 'Michelle Lee', reliabilityDRI: 'Dana Wilson' }
+      },
+      'Data Warehouse': { 
+        name: 'Data Warehouse',
+        ownership: { engineeringManager: 'Barbara Rodriguez', productManager: 'Steven Clark', reliabilityDRI: 'Pat Young' }
+      },
+      'ML Platform': { 
+        name: 'ML Platform',
+        ownership: { engineeringManager: 'Joseph Martinez', productManager: 'Laura Walker', reliabilityDRI: 'Chris Allen' }
+      },
+      'Data Quality': { 
+        name: 'Data Quality',
+        ownership: { engineeringManager: 'Nancy Hernandez', productManager: 'Kevin King', reliabilityDRI: 'Sam Wright' }
+      }
     }
   },
   'Mobile': {
     name: 'Mobile',
     teams: {
-      'iOS': { name: 'iOS' },
-      'Android': { name: 'Android' },
-      'React Native': { name: 'React Native' },
-      'Mobile Backend': { name: 'Mobile Backend' }
+      'iOS': { 
+        name: 'iOS',
+        ownership: { engineeringManager: 'Mark Scott', productManager: 'Stephanie Green', reliabilityDRI: 'Morgan Baker' }
+      },
+      'Android': { 
+        name: 'Android',
+        ownership: { engineeringManager: 'Sandra Adams', productManager: 'Brian Nelson', reliabilityDRI: 'Taylor Hill' }
+      },
+      'React Native': { 
+        name: 'React Native',
+        ownership: { engineeringManager: 'Paul Mitchell', productManager: 'Donna Campbell', reliabilityDRI: 'Jordan Roberts' }
+      },
+      'Mobile Backend': { 
+        name: 'Mobile Backend',
+        ownership: { engineeringManager: 'Betty Turner', productManager: 'George Phillips', reliabilityDRI: 'Alex Evans' }
+      }
     }
   }
 };
 
-// Sample first and last names for ownership generation
-const firstNames = [
-  "Alex", "Jordan", "Taylor", "Casey", "Morgan", "Riley", "Quinn", "Avery",
-  "Jamie", "Cameron", "Drew", "Hayden", "Skyler", "Reese", "Blake", "Parker",
-  "Sam", "Chris", "Pat", "Dana", "Jesse", "Robin", "Shannon", "Kelly",
-  "Maria", "David", "Sarah", "Michael", "Jennifer", "James", "Emily", "Robert",
-  "Lisa", "William", "Amanda", "Daniel", "Rachel", "Matthew", "Nicole", "Andrew",
-  "Priya", "Wei", "Yuki", "Carlos", "Sofia", "Omar", "Fatima", "Raj"
-];
-
-const lastNames = [
-  "Chen", "Rodriguez", "Patel", "Williams", "Kim", "Nguyen", "Martinez", "Garcia",
-  "Johnson", "Smith", "Lee", "Brown", "Miller", "Davis", "Wilson", "Taylor",
-  "Anderson", "Thomas", "Jackson", "White", "Harris", "Martin", "Thompson", "Moore",
-  "Young", "Allen", "King", "Wright", "Scott", "Green", "Baker", "Adams",
-  "Kumar", "Singh", "Wang", "Liu", "Yamamoto", "Santos", "Ali", "Ibrahim"
-];
-
-// Generate a random name
-function generateRandomName() {
-  const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-  const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-  return `${firstName} ${lastName}`;
-}
-
-// Generate ownership info for a team
-function generateOwnership() {
-  return {
-    engineeringManager: generateRandomName(),
-    productManager: generateRandomName(),
-    reliabilityDRI: generateRandomName()
-  };
-}
+// Default ownership for teams without explicit ownership data
+const defaultOwnership = {
+  engineeringManager: 'TBD',
+  productManager: 'TBD',
+  reliabilityDRI: 'TBD'
+};
 
 // Sample SLO names
 const sloNames = [
@@ -137,8 +198,7 @@ function generateTeamData(targetScore) {
     slos: [],
     images: [],
     tickets: [],
-    problems: [],
-    ownership: generateOwnership()
+    problems: []
   };
 
   // Generate 3-8 SLOs
@@ -401,17 +461,12 @@ function getAllTeamPaths() {
   return paths;
 }
 
-// Get or generate ownership for a team
+// Get ownership for a team from its data or return default
 function getOrGenerateOwnership(teamData) {
   if (teamData && teamData.ownership) {
     return teamData.ownership;
   }
-  // Generate and store ownership so it stays consistent
-  const ownership = generateOwnership();
-  if (teamData) {
-    teamData.ownership = ownership;
-  }
-  return ownership;
+  return defaultOwnership;
 }
 
 // Export for use in other modules
@@ -426,7 +481,6 @@ if (typeof module !== 'undefined' && module.exports) {
     getMockDataForTeam,
     updateMockDataForTeam,
     getAllTeamPaths,
-    generateOwnership,
     getOrGenerateOwnership
   };
 }
@@ -443,7 +497,6 @@ if (typeof window !== 'undefined') {
     getMockDataForTeam,
     updateMockDataForTeam,
     getAllTeamPaths,
-    generateOwnership,
     getOrGenerateOwnership
   };
 }

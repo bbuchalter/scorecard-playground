@@ -59,6 +59,9 @@ function buildOrgTree(mockData, hierarchy, config, normMethods, compute) {
         // Build team's children (sub-teams)
         Object.keys(teamMockData.subTeams).forEach(subTeamKey => {
           const subTeamData = teamMockData.subTeams[subTeamKey];
+          // Get ownership from hierarchy
+          const subTeamHierarchy = teamHierarchy.subTeams && teamHierarchy.subTeams[subTeamKey];
+          const ownership = (subTeamHierarchy && subTeamHierarchy.ownership) || null;
           const metrics = computeTeamMetrics(subTeamData, config, normMethods, compute);
           
           const subTeamNode = {
@@ -68,7 +71,8 @@ function buildOrgTree(mockData, hierarchy, config, normMethods, compute) {
             isLeaf: true,
             children: [],
             metrics: metrics,
-            rawData: subTeamData
+            rawData: subTeamData,
+            ownership: ownership
           };
           
           teamNode.children.push(subTeamNode);
@@ -77,6 +81,8 @@ function buildOrgTree(mockData, hierarchy, config, normMethods, compute) {
         groupNode.children.push(teamNode);
       } else {
         // Leaf team (no sub-teams)
+        // Get ownership from hierarchy
+        const ownership = teamHierarchy.ownership || null;
         const metrics = computeTeamMetrics(teamMockData, config, normMethods, compute);
         
         const teamNode = {
@@ -86,7 +92,8 @@ function buildOrgTree(mockData, hierarchy, config, normMethods, compute) {
           isLeaf: true,
           children: [],
           metrics: metrics,
-          rawData: teamMockData
+          rawData: teamMockData,
+          ownership: ownership
         };
         
         groupNode.children.push(teamNode);
@@ -320,20 +327,19 @@ function calculateAverageTrend(node) {
 
 /**
  * Get ownership info for a node
- * Uses the node's raw data if it's a leaf, or the first leaf descendant's ownership otherwise
+ * Uses the node's ownership if it's a leaf, or the first leaf descendant's ownership otherwise
  * @param {OrgNode} node - Node to get ownership for
- * @param {Function} getOrGenerateOwnership - Function to get/generate ownership
  * @returns {Object|null} - Ownership object or null
  */
-function getNodeOwnership(node, getOrGenerateOwnership) {
-  if (node.isLeaf && node.rawData) {
-    return getOrGenerateOwnership(node.rawData);
+function getNodeOwnership(node) {
+  if (node.isLeaf && node.ownership) {
+    return node.ownership;
   }
   
   // For non-leaf nodes (including root), get ownership from first leaf descendant
   const leaves = getAllLeafNodes(node);
-  if (leaves.length > 0 && leaves[0].rawData) {
-    return getOrGenerateOwnership(leaves[0].rawData);
+  if (leaves.length > 0 && leaves[0].ownership) {
+    return leaves[0].ownership;
   }
   
   return null;
