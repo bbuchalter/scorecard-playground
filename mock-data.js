@@ -406,7 +406,12 @@ function getOrGenerateOwnership(teamData) {
   if (teamData && teamData.ownership) {
     return teamData.ownership;
   }
-  return generateOwnership();
+  // Generate and store ownership so it stays consistent
+  const ownership = generateOwnership();
+  if (teamData) {
+    teamData.ownership = ownership;
+  }
+  return ownership;
 }
 
 // Export for use in other modules

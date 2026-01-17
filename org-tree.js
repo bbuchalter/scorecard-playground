@@ -326,16 +326,11 @@ function calculateAverageTrend(node) {
  * @returns {Object|null} - Ownership object or null
  */
 function getNodeOwnership(node, getOrGenerateOwnership) {
-  if (node.level === 0) {
-    // Root R&D - no specific ownership
-    return null;
-  }
-  
   if (node.isLeaf && node.rawData) {
     return getOrGenerateOwnership(node.rawData);
   }
   
-  // For non-leaf nodes, get ownership from first leaf descendant
+  // For non-leaf nodes (including root), get ownership from first leaf descendant
   const leaves = getAllLeafNodes(node);
   if (leaves.length > 0 && leaves[0].rawData) {
     return getOrGenerateOwnership(leaves[0].rawData);
