@@ -2121,9 +2121,9 @@
     // Sanitize teamName for use in canvas IDs (replace spaces and special chars)
     const safeId = teamName.replace(/[^a-zA-Z0-9]/g, '-');
 
-    // On sub-team pages (navigationPath.length === 3), the trend chart is in the hero section
-    const isSubTeamPage = navigationPath.length === 3;
-    const trendChartHtml = isSubTeamPage ? '' : `
+    // Trend chart is now shown inline in the hero section for leaf pages
+    const isLeafPage = navigationPath.length >= 2;
+    const trendChartHtml = isLeafPage ? '' : `
       <div class="trend-chart-container">
         <div class="trend-chart-title">Metrics Trend</div>
         <div class="trend-chart-canvas">
@@ -2196,9 +2196,9 @@
 
     document.getElementById('tableContainer').innerHTML = html;
 
-    // Create trend chart (only if not on sub-team page) and sparklines
+    // Create trend chart (only if not on leaf page) and sparklines
     setTimeout(() => {
-      if (!isSubTeamPage) {
+      if (!isLeafPage) {
         createFullLineChart(`chart-trend-${safeId}`, metrics);
       }
       createSparkline(`chart-single-${safeId}-grade`, avgTrend, avg);
