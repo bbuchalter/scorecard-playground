@@ -396,20 +396,11 @@
       position: relative;
     }
 
-    .hero-top-left {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      max-width: 180px;
-    }
-
     .hero-grade-title {
       font-size: 14px;
       font-weight: 700;
       color: var(--text);
+      margin-bottom: 12px;
     }
 
     .ownership-info {
@@ -660,8 +651,14 @@
 
     .hero-top-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: auto 1fr;
       gap: 20px;
+    }
+
+    .hero-grade-column {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
     @media (max-width: 600px) {
@@ -679,7 +676,23 @@
       background: rgba(255,255,255,.03);
       border-radius: 16px;
       border: 1px solid var(--border);
-      position: relative;
+      flex: 1;
+    }
+
+    .hero-ownership-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 16px;
+      background: rgba(255,255,255,.03);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .hero-ownership-panel .ownership-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .hero-metrics-panel {
@@ -708,15 +721,6 @@
       width: 140px;
       height: 40px;
       margin-top: 8px;
-    }
-
-    .hero-grade-compact .ownership-info {
-      font-size: 9px;
-      max-width: 120px;
-    }
-
-    .hero-grade-compact .ownership-role {
-      font-size: 8px;
     }
 
     .hero-metrics-bars {
@@ -1507,28 +1511,25 @@
     return OrgTree.getNodeOwnership(currentNode);
   }
 
-  function renderTopLeftHtml(name, ownership) {
-    const ownershipHtml = ownership ? `
-      <div class="ownership-info">
-        <div class="ownership-row">
-          <span class="ownership-role">Engineering Manager</span>
-          <span class="ownership-name">${escapeHtml(ownership.engineeringManager)}</span>
-        </div>
-        <div class="ownership-row">
-          <span class="ownership-role">Product Manager</span>
-          <span class="ownership-name">${escapeHtml(ownership.productManager)}</span>
-        </div>
-        <div class="ownership-row">
-          <span class="ownership-role">Reliability DRI</span>
-          <span class="ownership-name">${escapeHtml(ownership.reliabilityDRI)}</span>
-        </div>
-      </div>
-    ` : '';
+  function renderOwnershipPanel(ownership) {
+    if (!ownership) return '';
     
     return `
-      <div class="hero-top-left">
-        <div class="hero-grade-title">${escapeHtml(name)}</div>
-        ${ownershipHtml}
+      <div class="hero-ownership-panel">
+        <div class="ownership-info">
+          <div class="ownership-row">
+            <span class="ownership-role">Engineering Manager</span>
+            <span class="ownership-name">${escapeHtml(ownership.engineeringManager)}</span>
+          </div>
+          <div class="ownership-row">
+            <span class="ownership-role">Product Manager</span>
+            <span class="ownership-name">${escapeHtml(ownership.productManager)}</span>
+          </div>
+          <div class="ownership-row">
+            <span class="ownership-role">Reliability DRI</span>
+            <span class="ownership-name">${escapeHtml(ownership.reliabilityDRI)}</span>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -1679,38 +1680,41 @@
         <div class="hero-section-subteam">
           <div class="hero-left-column">
             <div class="hero-top-row">
-              <div class="hero-grade-compact">
-                ${renderTopLeftHtml(currentNode.name, ownership)}
-                <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
-                <div class="grade-tooltip-wrapper">
-                  <div class="hero-grade-score">${Math.round(earnedScore)}/${totalBudget}</div>
-                  <div class="grade-info-icon">?</div>
-                  <div class="grade-tooltip">
-                    <div class="grade-tooltip-title">Score to Grade</div>
-                    <div class="grade-tooltip-scale">
-                      <div class="grade-tooltip-row">
-                        <span class="grade-tooltip-letter grade-a">A</span>
-                        <span class="grade-tooltip-range">90 – 100</span>
-                      </div>
-                      <div class="grade-tooltip-row">
-                        <span class="grade-tooltip-letter grade-b">B</span>
-                        <span class="grade-tooltip-range">80 – 89</span>
-                      </div>
-                      <div class="grade-tooltip-row">
-                        <span class="grade-tooltip-letter grade-c">C</span>
-                        <span class="grade-tooltip-range">70 – 79</span>
-                      </div>
-                      <div class="grade-tooltip-row">
-                        <span class="grade-tooltip-letter grade-d">D</span>
-                        <span class="grade-tooltip-range">60 – 69</span>
-                      </div>
-                      <div class="grade-tooltip-row">
-                        <span class="grade-tooltip-letter grade-f">F</span>
-                        <span class="grade-tooltip-range">0 – 59</span>
+              <div class="hero-grade-column">
+                <div class="hero-grade-compact">
+                  <div class="hero-grade-title">${escapeHtml(currentNode.name)}</div>
+                  <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
+                  <div class="grade-tooltip-wrapper">
+                    <div class="hero-grade-score">${Math.round(earnedScore)}/${totalBudget}</div>
+                    <div class="grade-info-icon">?</div>
+                    <div class="grade-tooltip">
+                      <div class="grade-tooltip-title">Score to Grade</div>
+                      <div class="grade-tooltip-scale">
+                        <div class="grade-tooltip-row">
+                          <span class="grade-tooltip-letter grade-a">A</span>
+                          <span class="grade-tooltip-range">90 – 100</span>
+                        </div>
+                        <div class="grade-tooltip-row">
+                          <span class="grade-tooltip-letter grade-b">B</span>
+                          <span class="grade-tooltip-range">80 – 89</span>
+                        </div>
+                        <div class="grade-tooltip-row">
+                          <span class="grade-tooltip-letter grade-c">C</span>
+                          <span class="grade-tooltip-range">70 – 79</span>
+                        </div>
+                        <div class="grade-tooltip-row">
+                          <span class="grade-tooltip-letter grade-d">D</span>
+                          <span class="grade-tooltip-range">60 – 69</span>
+                        </div>
+                        <div class="grade-tooltip-row">
+                          <span class="grade-tooltip-letter grade-f">F</span>
+                          <span class="grade-tooltip-range">0 – 59</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
+                ${renderOwnershipPanel(ownership)}
               </div>
               <div class="hero-metrics-panel">
                 <div class="hero-metrics-bars">
