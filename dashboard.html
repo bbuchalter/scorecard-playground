@@ -697,6 +697,108 @@
       font-size: 8px;
     }
 
+    /* Grade tooltip */
+    .grade-tooltip-wrapper {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .grade-info-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: help;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .grade-info-icon:hover {
+      background: rgba(255,255,255,.25);
+      border-color: rgba(255,255,255,.4);
+      color: var(--text);
+    }
+
+    .grade-tooltip {
+      position: absolute;
+      bottom: calc(100% + 12px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(17, 25, 53, 0.98);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 10px;
+      padding: 14px 16px;
+      width: 200px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.4);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+      z-index: 1000;
+    }
+
+    .grade-tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 8px solid transparent;
+      border-top-color: rgba(17, 25, 53, 0.98);
+    }
+
+    .grade-tooltip-wrapper:hover .grade-tooltip {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .grade-tooltip-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .grade-tooltip-scale {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .grade-tooltip-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .grade-tooltip-letter {
+      font-weight: 700;
+      width: 20px;
+      text-align: center;
+    }
+
+    .grade-tooltip-letter.grade-a { color: var(--excellent); }
+    .grade-tooltip-letter.grade-b { color: var(--good); }
+    .grade-tooltip-letter.grade-c { color: var(--fair); }
+    .grade-tooltip-letter.grade-d { color: var(--at-risk); }
+    .grade-tooltip-letter.grade-f { color: var(--critical); }
+
+    .grade-tooltip-range {
+      color: var(--muted);
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+    }
+
     .trend-chart-inline {
       flex: 1;
       background: rgba(255,255,255,.03);
@@ -1424,7 +1526,35 @@
               ${renderOwnershipHtml(ownership)}
               <div class="hero-grade-title">${escapeHtml(currentNode.name)}</div>
               <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
-              <div class="hero-grade-score">${avg}/100</div>
+              <div class="grade-tooltip-wrapper">
+                <div class="hero-grade-score">${avg}/100</div>
+                <div class="grade-info-icon">?</div>
+                <div class="grade-tooltip">
+                  <div class="grade-tooltip-title">Score to Grade</div>
+                  <div class="grade-tooltip-scale">
+                    <div class="grade-tooltip-row">
+                      <span class="grade-tooltip-letter grade-a">A</span>
+                      <span class="grade-tooltip-range">90 – 100</span>
+                    </div>
+                    <div class="grade-tooltip-row">
+                      <span class="grade-tooltip-letter grade-b">B</span>
+                      <span class="grade-tooltip-range">80 – 89</span>
+                    </div>
+                    <div class="grade-tooltip-row">
+                      <span class="grade-tooltip-letter grade-c">C</span>
+                      <span class="grade-tooltip-range">70 – 79</span>
+                    </div>
+                    <div class="grade-tooltip-row">
+                      <span class="grade-tooltip-letter grade-d">D</span>
+                      <span class="grade-tooltip-range">60 – 69</span>
+                    </div>
+                    <div class="grade-tooltip-row">
+                      <span class="grade-tooltip-letter grade-f">F</span>
+                      <span class="grade-tooltip-range">0 – 59</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="trend-chart-inline">
               <div class="trend-chart-title">Metrics Trend</div>
