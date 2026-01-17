@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mock Data Editor - Company Scorecard</title>
   <script src="cache-version.js"></script>
+  <script src="team-navigation.js"></script>
   <script src="scorecard-config.js"></script>
   <script src="scorecard-compute.js"></script>
   <script src="mock-data.js"></script>
@@ -515,15 +516,30 @@
     }
   }
 
+  // Handle navigation (called by TeamNavigation on popstate or direct navigation)
+  function handleTeamNavigation(path) {
+    const teams = MockData.getAllTeamPaths();
+    const teamIndex = TeamNavigation.findTeamIndex(teams, path);
+    
+    if (teamIndex !== -1) {
+      currentTeamPath = teams[teamIndex].path;
+      teamSelectorEl.value = teamIndex.toString();
+      loadTeamData();
+    } else if (teams.length > 0) {
+      // Path not found, default to first team
+      currentTeamPath = teams[0].path;
+      teamSelectorEl.value = '0';
+      loadTeamData();
+    }
+  }
+
   teamSelectorEl.addEventListener('change', () => {
     const idx = Number(teamSelectorEl.value);
     const teams = MockData.getAllTeamPaths();
     if (idx >= 0 && idx < teams.length) {
       currentTeamPath = teams[idx].path;
-      // Save selected team to localStorage for cross-page persistence
-      try {
-        localStorage.setItem('selectedTeamPath', JSON.stringify(currentTeamPath));
-      } catch (e) { /* ignore storage errors */ }
+      // Update URL and localStorage via TeamNavigation
+      TeamNavigation.navigateTo(currentTeamPath, null);
       loadTeamData();
     }
   });
@@ -851,51 +867,9 @@
   // ========== INITIALIZATION ==========
   populateTeamSelector();
   
-  // Check for team parameter in URL, or load from localStorage
-  const urlParams = new URLSearchParams(window.location.search);
-  const teamParam = urlParams.get('team');
-  
-  if (teamParam) {
-    try {
-      const teamPath = JSON.parse(decodeURIComponent(teamParam));
-      if (Array.isArray(teamPath) && teamPath.length > 0) {
-        // Find matching team in selector
-        const teams = MockData.getAllTeamPaths();
-        const teamIndex = teams.findIndex(t => 
-          JSON.stringify(t.path) === JSON.stringify(teamPath)
-        );
-        
-        if (teamIndex !== -1) {
-          teamSelectorEl.value = teamIndex.toString();
-          currentTeamPath = teams[teamIndex].path;
-          // Save to localStorage for persistence
-          try {
-            localStorage.setItem('selectedTeamPath', JSON.stringify(currentTeamPath));
-          } catch (e) { /* ignore */ }
-          loadTeamData();
-        }
-      }
-    } catch (e) {
-      // Invalid JSON, ignore
-    }
-  } else {
-    // No URL param, check localStorage for saved team selection
-    try {
-      const savedTeamPath = localStorage.getItem('selectedTeamPath');
-      if (savedTeamPath) {
-        const teamPath = JSON.parse(savedTeamPath);
-        const teams = MockData.getAllTeamPaths();
-        const teamIndex = teams.findIndex(t => 
-          JSON.stringify(t.path) === JSON.stringify(teamPath)
-        );
-        if (teamIndex !== -1) {
-          teamSelectorEl.value = teamIndex.toString();
-          currentTeamPath = teams[teamIndex].path;
-          loadTeamData();
-        }
-      }
-    } catch (e) { /* ignore */ }
-  }
+  // Initialize team navigation with popstate handling
+  const initialPath = TeamNavigation.init(handleTeamNavigation);
+  handleTeamNavigation(initialPath);
 </script>
 </body>
 </html>

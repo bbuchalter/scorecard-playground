@@ -6,6 +6,7 @@
   <title>Scorecard Playground</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="cache-version.js"></script>
+  <script src="team-navigation.js"></script>
   <script src="scorecard-config.js"></script>
   <script src="scorecard-compute.js"></script>
   <script src="mock-data.js"></script>
@@ -4504,40 +4505,59 @@ ${items.map(it => `     ${it.name}: weighted=${fmt(it.weightedCount, 2)} → s =
     }
   }
 
+  // Handle navigation to a team path (shared logic for selector change and popstate)
+  function handleTeamNavigation(path, updateSelector = true) {
+    const teams = window.MockData.getAllTeamPaths();
+    const teamIndex = TeamNavigation.findTeamIndex(teams, path);
+    
+    let targetIndex = teamIndex;
+    if (targetIndex === -1 && teams.length > 0) {
+      targetIndex = 0; // Default to first team
+    }
+    
+    if (targetIndex === -1) return;
+    
+    currentTeamPath = teams[targetIndex].path;
+    
+    if (updateSelector) {
+      teamSelectorEl.value = targetIndex.toString();
+    }
+    
+    const teamData = loadTeamData(currentTeamPath);
+    
+    if (teamData) {
+      // Update all state with new team data
+      state.slos = teamData.slos;
+      vulnState.images = teamData.images;
+      bugState.tickets = teamData.tickets;
+      pmState.problems = teamData.problems;
+      
+      // Re-render all sections
+      renderTable();
+      renderVulnTable();
+      renderBugTable();
+      renderPmTable();
+      
+      // Recompute all scores
+      recompute();
+      recomputeVuln();
+      recomputeBug();
+      recomputePm();
+      
+      // Update sidebar links
+      updateDashboardLink();
+      updateDataEditorLink();
+    }
+  }
+
   teamSelectorEl.addEventListener('change', () => {
     const idx = Number(teamSelectorEl.value);
     const teams = window.MockData.getAllTeamPaths();
     if (idx >= 0 && idx < teams.length) {
       currentTeamPath = teams[idx].path;
-      // Save selected team to localStorage for cross-page persistence
-      try {
-        localStorage.setItem('selectedTeamPath', JSON.stringify(currentTeamPath));
-      } catch (e) { /* ignore storage errors */ }
-      const teamData = loadTeamData(currentTeamPath);
-      
-      if (teamData) {
-        // Update all state with new team data
-        state.slos = teamData.slos;
-        vulnState.images = teamData.images;
-        bugState.tickets = teamData.tickets;
-        pmState.problems = teamData.problems;
-        
-        // Re-render all sections
-        renderTable();
-        renderVulnTable();
-        renderBugTable();
-        renderPmTable();
-        
-        // Recompute all scores
-        recompute();
-        recomputeVuln();
-        recomputeBug();
-        recomputePm();
-        
-        // Update sidebar links
-        updateDashboardLink();
-        updateDataEditorLink();
-      }
+      // Update URL and localStorage via TeamNavigation
+      TeamNavigation.navigateTo(currentTeamPath, null);
+      handleTeamNavigation(currentTeamPath, false);
     }
   });
   
@@ -4550,109 +4570,68 @@ ${items.map(it => `     ${it.name}: weighted=${fmt(it.weightedCount, 2)} → s =
   saveAllState(); // Save initial state
 
   // ---------- URL Parameter Handling ----------
-  // Handle deep links from dashboard priority work items
-  function handleUrlParameters() {
+  // Handle deep links from dashboard priority work items (scroll to specific item)
+  function handleItemScroll() {
     const params = new URLSearchParams(window.location.search);
-    const teamParam = params.get('team');
     const itemParam = params.get('item');
     
-    // If no URL param, check localStorage for saved team selection
-    if (!teamParam) {
-      try {
-        const savedTeamPath = localStorage.getItem('selectedTeamPath');
-        if (savedTeamPath) {
-          const teamPath = JSON.parse(savedTeamPath);
-          const teams = window.MockData.getAllTeamPaths();
-          const teamIndex = teams.findIndex(t => 
-            t.path.length === teamPath.length && 
-            t.path.every((p, i) => p === teamPath[i])
-          );
-          if (teamIndex !== -1) {
-            teamSelectorEl.value = teamIndex.toString();
-            teamSelectorEl.dispatchEvent(new Event('change'));
+    if (!itemParam) return;
+    
+    const decodedItem = decodeURIComponent(itemParam);
+    // Convert itemId (e.g., 'slo-0') to row ID (e.g., 'slo-row-0')
+    const parts = decodedItem.split('-');
+    if (parts.length === 2) {
+      const [category, idx] = parts;
+      const rowId = `${category}-row-${idx}`;
+      
+      // Wait for DOM to update, then scroll and highlight
+      setTimeout(() => {
+        const rowEl = document.getElementById(rowId);
+        if (rowEl) {
+          // Scroll to the row
+          rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          // Add highlight effect
+          rowEl.style.transition = 'background-color 0.3s ease';
+          rowEl.style.backgroundColor = 'rgba(147, 197, 253, 0.3)';
+          
+          // Remove highlight after a moment
+          setTimeout(() => {
+            rowEl.style.backgroundColor = '';
+            // Focus the first input in the row
+            const firstInput = rowEl.querySelector('input, select');
+            if (firstInput) {
+              firstInput.focus();
+            }
+          }, 2000);
+        } else {
+          // If row not found, scroll to the section
+          const sectionMap = {
+            'slo': 'section-slos',
+            'vuln': 'section-vulns',
+            'bug': 'section-bugs',
+            'pm': 'section-postmortems'
+          };
+          const sectionId = sectionMap[category];
+          if (sectionId) {
+            const sectionEl = document.getElementById(sectionId);
+            if (sectionEl) {
+              sectionEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
           }
         }
-      } catch (e) { /* ignore */ }
-      return;
-    }
-    
-    try {
-      const teamPath = JSON.parse(decodeURIComponent(teamParam));
-      if (!Array.isArray(teamPath)) return;
-      
-      // Find the team index in the selector
-      const teams = window.MockData.getAllTeamPaths();
-      const teamIndex = teams.findIndex(t => 
-        t.path.length === teamPath.length && 
-        t.path.every((p, i) => p === teamPath[i])
-      );
-      
-      if (teamIndex === -1) return;
-      
-      // Select the team
-      teamSelectorEl.value = teamIndex.toString();
-      teamSelectorEl.dispatchEvent(new Event('change'));
-      
-      // If there's an item to scroll to, wait for render then scroll
-      if (itemParam) {
-        const decodedItem = decodeURIComponent(itemParam);
-        // Convert itemId (e.g., 'slo-0') to row ID (e.g., 'slo-row-0')
-        const parts = decodedItem.split('-');
-        if (parts.length === 2) {
-          const [category, idx] = parts;
-          const rowId = `${category}-row-${idx}`;
-          
-          // Wait for DOM to update, then scroll and highlight
-          setTimeout(() => {
-            const rowEl = document.getElementById(rowId);
-            if (rowEl) {
-              // Scroll to the row
-              rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              
-              // Add highlight effect
-              rowEl.style.transition = 'background-color 0.3s ease';
-              rowEl.style.backgroundColor = 'rgba(147, 197, 253, 0.3)';
-              
-              // Remove highlight after a moment
-              setTimeout(() => {
-                rowEl.style.backgroundColor = '';
-                // Focus the first input in the row
-                const firstInput = rowEl.querySelector('input, select');
-                if (firstInput) {
-                  firstInput.focus();
-                }
-              }, 2000);
-            } else {
-              // If row not found, scroll to the section
-              const sectionMap = {
-                'slo': 'section-slos',
-                'vuln': 'section-vulns',
-                'bug': 'section-bugs',
-                'pm': 'section-postmortems'
-              };
-              const sectionId = sectionMap[category];
-              if (sectionId) {
-                const sectionEl = document.getElementById(sectionId);
-                if (sectionEl) {
-                  sectionEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-              }
-            }
-          }, 100);
-        }
-      }
-      
-      // Clean up URL without reloading
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, cleanUrl);
-      
-    } catch (e) {
-      console.warn('Could not parse URL parameters:', e);
+      }, 100);
     }
   }
   
-  // Run URL parameter handling after a short delay to ensure everything is rendered
-  setTimeout(handleUrlParameters, 50);
+  // Initialize team navigation with popstate handling
+  const initialPath = TeamNavigation.init((path) => {
+    handleTeamNavigation(path, true);
+  });
+  handleTeamNavigation(initialPath, true);
+  
+  // Handle item scroll for deep links
+  setTimeout(handleItemScroll, 50);
 </script>
 </body>
 </html>

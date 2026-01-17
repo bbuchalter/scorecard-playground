@@ -6,6 +6,7 @@
   <title>Company Scorecards</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="cache-version.js"></script>
+  <script src="team-navigation.js"></script>
   <script src="scorecard-config.js"></script>
   <script src="scorecard-compute.js"></script>
   <script src="mock-data.js"></script>
@@ -1704,18 +1705,16 @@
   }
 
   // ========== NAVIGATION ==========
-  function updateUrl(path, pushState = true) {
-    const url = new URL(window.location);
-    if (path.length > 0) {
-      url.searchParams.set('team', JSON.stringify(path));
+  // Handle navigation to a path (shared logic for clicks and popstate)
+  function handleNavigation(path) {
+    const node = OrgTree.getNodeByPath(orgTree, path);
+    if (node) {
+      currentNode = node;
+      render();
     } else {
-      url.searchParams.delete('team');
-    }
-    
-    if (pushState) {
-      history.pushState({ path: path }, '', url);
-    } else {
-      history.replaceState({ path: path }, '', url);
+      // Path not found, go to root
+      currentNode = orgTree;
+      render();
     }
   }
 
@@ -1723,62 +1722,23 @@
     const node = OrgTree.getNodeByPath(orgTree, path);
     if (node) {
       currentNode = node;
-      updateUrl(path);
+      // Update URL and localStorage via TeamNavigation
+      TeamNavigation.navigateTo(path, null);
       render();
     }
   }
 
-  // Handle browser back/forward buttons
-  window.addEventListener('popstate', (event) => {
-    let path = [];
-    
-    if (event.state && event.state.path !== undefined) {
-      path = event.state.path;
-    } else {
-      // Parse from URL if no state (e.g., initial page load)
-      const urlParams = new URLSearchParams(window.location.search);
-      const teamParam = urlParams.get('team');
-      if (teamParam) {
-        try {
-          path = JSON.parse(teamParam);
-        } catch (e) {
-          path = [];
-        }
-      }
-    }
-    
-    const node = OrgTree.getNodeByPath(orgTree, path);
-    if (node) {
-      currentNode = node;
-      render();
-    }
-  });
-
   // ========== INITIALIZATION ==========
   document.addEventListener('DOMContentLoaded', () => {
-    // Check for team parameter in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const teamParam = urlParams.get('team');
-    let path = [];
+    // Initialize team navigation with popstate handling
+    const initialPath = TeamNavigation.init(handleNavigation);
     
-    if (teamParam) {
-      try {
-        const teamPath = JSON.parse(decodeURIComponent(teamParam));
-        if (Array.isArray(teamPath) && teamPath.length > 0) {
-          // Validate the path exists in tree
-          const node = OrgTree.getNodeByPath(orgTree, teamPath);
-          if (node) {
-            path = teamPath;
-            currentNode = node;
-          }
-        }
-      } catch (e) {
-        // Invalid JSON, ignore
-      }
+    // Navigate to initial path (validate it exists in org tree)
+    const node = OrgTree.getNodeByPath(orgTree, initialPath);
+    if (node) {
+      currentNode = node;
     }
-    
-    // Set initial history state so back button works from first navigation
-    updateUrl(path, false);
+    // If path not found, currentNode stays at orgTree root
     
     render();
   });
