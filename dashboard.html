@@ -8,6 +8,7 @@
   <script src="scorecard-config.js"></script>
   <script src="scorecard-compute.js"></script>
   <script src="mock-data.js"></script>
+  <script src="org-tree.js"></script>
   <style>
     :root {
       --bg: #0b1020;
@@ -742,114 +743,16 @@
   const mockData = window.MockData.loadMockData();
   const normMethods = window.ScorecardConfig.normMethods;
   const compute = window.ScorecardCompute;
+  const OrgTree = window.OrgTree;
 
-  // Helper function to compute metrics for a team
-  function computeTeamMetrics(teamData) {
-    const sloResult = compute.computeSloScore(teamData.slos || [], config.slo, normMethods);
-    const vulnResult = compute.computeVulnScore(teamData.images || [], config.vuln, normMethods);
-    const bugResult = compute.computeBugScore(teamData.tickets || [], config.bug, normMethods);
-    const pmResult = compute.computePmScore(teamData.problems || [], config.pm, normMethods);
-
-    // Convert scores (0-100) to match dashboard format
-    return {
-      slos: { score: Math.round(sloResult.S * 100), trend: [85, 86, 87, Math.round(sloResult.S * 100)] },
-      vulns: { score: Math.round(vulnResult.S * 100), trend: [72, 74, 75, Math.round(vulnResult.S * 100)] },
-      bugs: { score: Math.round(bugResult.S * 100), trend: [78, 79, 80, Math.round(bugResult.S * 100)] },
-      postmortems: { score: Math.round(pmResult.S * 100), trend: [58, 55, 53, Math.round(pmResult.S * 100)] }
-    };
-  }
-
-  // Build organization data structure from mock data
-  function buildOrganizationData() {
-    const orgData = {};
-
-    Object.keys(mockData).forEach(groupKey => {
-      const groupMockData = mockData[groupKey];
-      const hierarchy = window.MockData.organizationHierarchy[groupKey];
-      
-      orgData[groupKey] = {
-        name: hierarchy.name,
-        subTeams: Object.keys(hierarchy.teams),
-        teams: {}
-      };
-
-      // Aggregate metrics for the group (average of all leaf teams)
-      let groupMetricsSum = { slos: 0, vulns: 0, bugs: 0, postmortems: 0 };
-      let leafTeamCount = 0;
-
-      Object.keys(groupMockData.teams).forEach(teamKey => {
-        const teamMockData = groupMockData.teams[teamKey];
-        const teamHierarchy = hierarchy.teams[teamKey];
-
-        if (teamMockData.subTeams) {
-          // Team with sub-teams
-          orgData[groupKey].teams[teamKey] = {
-            subTeams: {}
-          };
-
-          let teamMetricsSum = { slos: 0, vulns: 0, bugs: 0, postmortems: 0 };
-          let subTeamCount = 0;
-
-          Object.keys(teamMockData.subTeams).forEach(subTeamKey => {
-            const subTeamData = teamMockData.subTeams[subTeamKey];
-            const metrics = computeTeamMetrics(subTeamData);
-            
-            orgData[groupKey].teams[teamKey].subTeams[subTeamKey] = {
-              metrics: metrics
-            };
-
-            // Aggregate for team
-            teamMetricsSum.slos += metrics.slos.score;
-            teamMetricsSum.vulns += metrics.vulns.score;
-            teamMetricsSum.bugs += metrics.bugs.score;
-            teamMetricsSum.postmortems += metrics.postmortems.score;
-            subTeamCount++;
-            
-            // Aggregate for group
-            groupMetricsSum.slos += metrics.slos.score;
-            groupMetricsSum.vulns += metrics.vulns.score;
-            groupMetricsSum.bugs += metrics.bugs.score;
-            groupMetricsSum.postmortems += metrics.postmortems.score;
-            leafTeamCount++;
-          });
-
-          // Set team metrics as average of sub-teams
-          orgData[groupKey].teams[teamKey].metrics = {
-            slos: { score: Math.round(teamMetricsSum.slos / subTeamCount), trend: [85, 86, 87, Math.round(teamMetricsSum.slos / subTeamCount)] },
-            vulns: { score: Math.round(teamMetricsSum.vulns / subTeamCount), trend: [72, 74, 75, Math.round(teamMetricsSum.vulns / subTeamCount)] },
-            bugs: { score: Math.round(teamMetricsSum.bugs / subTeamCount), trend: [78, 79, 80, Math.round(teamMetricsSum.bugs / subTeamCount)] },
-            postmortems: { score: Math.round(teamMetricsSum.postmortems / subTeamCount), trend: [58, 55, 53, Math.round(teamMetricsSum.postmortems / subTeamCount)] }
-          };
-        } else {
-          // Leaf team
-          const metrics = computeTeamMetrics(teamMockData);
-          orgData[groupKey].teams[teamKey] = {
-            metrics: metrics
-          };
-
-          // Aggregate for group
-          groupMetricsSum.slos += metrics.slos.score;
-          groupMetricsSum.vulns += metrics.vulns.score;
-          groupMetricsSum.bugs += metrics.bugs.score;
-          groupMetricsSum.postmortems += metrics.postmortems.score;
-          leafTeamCount++;
-        }
-      });
-
-      // Set group metrics as average of all leaf teams
-      orgData[groupKey].metrics = {
-        slos: { score: Math.round(groupMetricsSum.slos / leafTeamCount), trend: [85, 86, 87, Math.round(groupMetricsSum.slos / leafTeamCount)] },
-        vulns: { score: Math.round(groupMetricsSum.vulns / leafTeamCount), trend: [72, 74, 75, Math.round(groupMetricsSum.vulns / leafTeamCount)] },
-        bugs: { score: Math.round(groupMetricsSum.bugs / leafTeamCount), trend: [78, 79, 80, Math.round(groupMetricsSum.bugs / leafTeamCount)] },
-        postmortems: { score: Math.round(groupMetricsSum.postmortems / leafTeamCount), trend: [58, 55, 53, Math.round(groupMetricsSum.postmortems / leafTeamCount)] }
-      };
-    });
-
-    return orgData;
-  }
-
-  // Build organization data dynamically
-  const organizationData = buildOrganizationData();
+  // Build organization tree using unified tree model
+  const orgTree = OrgTree.buildOrgTree(
+    mockData, 
+    window.MockData.organizationHierarchy,
+    config,
+    normMethods,
+    compute
+  );
 
   // Original hardcoded data structure preserved for reference:
   /*
@@ -1182,7 +1085,7 @@
   */
 
   // ========== STATE MANAGEMENT ==========
-  let navigationPath = []; // Array to track path: [] = top-level, ['Applications'] = group, ['Applications', 'Backend API'] = team, ['Applications', 'Backend API', 'API Gateway'] = sub-team
+  let currentNode = orgTree; // Current node in the tree (starts at root)
   let chartInstances = {};
 
   // ========== HELPER FUNCTIONS (from shared scorecard-compute.js) ==========
@@ -1378,31 +1281,9 @@
     });
   }
 
-  function calculateAverage(groupData) {
-    const metrics = groupData.metrics;
-    const scores = [
-      metrics.slos.score,
-      metrics.vulns.score,
-      metrics.bugs.score,
-      metrics.postmortems.score
-    ];
-    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-  }
-
-  function calculateAverageTrend(groupData) {
-    const metrics = groupData.metrics;
-    const trend = [];
-    for (let i = 0; i < 4; i++) {
-      const periodAvg = Math.round(
-        (metrics.slos.trend[i] + 
-         metrics.vulns.trend[i] + 
-         metrics.bugs.trend[i] + 
-         metrics.postmortems.trend[i]) / 4
-      );
-      trend.push(periodAvg);
-    }
-    return trend;
-  }
+  // Use tree utility functions for average calculations
+  const calculateAverageScore = OrgTree.calculateAverageScore;
+  const calculateAverageTrend = OrgTree.calculateAverageTrend;
 
   // ========== HELPER FUNCTIONS ==========
   function escapeHtml(text) {
@@ -1412,62 +1293,16 @@
   }
 
   function getConfigUrl() {
-    if (navigationPath.length === 0) {
+    if (currentNode.path.length === 0) {
       return 'index.html';
     }
-    const teamParam = encodeURIComponent(JSON.stringify(navigationPath));
+    const teamParam = encodeURIComponent(JSON.stringify(currentNode.path));
     return `index.html?team=${teamParam}`;
   }
 
-  // Get ownership info for the current navigation level
-  // Uses getOrGenerateOwnership to handle legacy data without ownership
+  // Get ownership info for the current node
   function getOwnershipInfo() {
-    const getOrGenerate = window.MockData.getOrGenerateOwnership;
-    
-    if (navigationPath.length === 0) {
-      // Top-level R&D - no specific ownership
-      return null;
-    } else if (navigationPath.length === 1) {
-      // Group level - aggregate from first team with ownership
-      const groupKey = navigationPath[0];
-      const groupMockData = mockData[groupKey];
-      if (groupMockData && groupMockData.teams) {
-        const firstTeamKey = Object.keys(groupMockData.teams)[0];
-        const firstTeam = groupMockData.teams[firstTeamKey];
-        if (firstTeam.subTeams) {
-          const firstSubTeamKey = Object.keys(firstTeam.subTeams)[0];
-          return getOrGenerate(firstTeam.subTeams[firstSubTeamKey]);
-        }
-        return getOrGenerate(firstTeam);
-      }
-      return null;
-    } else if (navigationPath.length === 2) {
-      // Team level
-      const groupKey = navigationPath[0];
-      const teamKey = navigationPath[1];
-      const groupMockData = mockData[groupKey];
-      if (groupMockData && groupMockData.teams && groupMockData.teams[teamKey]) {
-        const teamData = groupMockData.teams[teamKey];
-        if (teamData.subTeams) {
-          const firstSubTeamKey = Object.keys(teamData.subTeams)[0];
-          return getOrGenerate(teamData.subTeams[firstSubTeamKey]);
-        }
-        return getOrGenerate(teamData);
-      }
-      return null;
-    } else if (navigationPath.length === 3) {
-      // Sub-team level
-      const groupKey = navigationPath[0];
-      const teamKey = navigationPath[1];
-      const subTeamKey = navigationPath[2];
-      const groupMockData = mockData[groupKey];
-      if (groupMockData && groupMockData.teams && groupMockData.teams[teamKey] &&
-          groupMockData.teams[teamKey].subTeams) {
-        return getOrGenerate(groupMockData.teams[teamKey].subTeams[subTeamKey]);
-      }
-      return null;
-    }
-    return null;
+    return OrgTree.getNodeOwnership(currentNode, window.MockData.getOrGenerateOwnership);
   }
 
   function renderOwnershipHtml(ownership) {
@@ -1491,111 +1326,22 @@
   }
 
   function calculatePriorityWork() {
-    const current = getCurrentData();
+    // Get all leaf nodes from current node
+    const leafNodes = OrgTree.getAllLeafNodes(currentNode);
     
-    // Get teams to process based on current navigation level
-    function getTeamsToProcess() {
-      const teams = [];
-      
-      if (current.type === 'top-level') {
-        // Top-level: get all leaf teams
-        Object.keys(mockData).forEach(groupKey => {
-          const groupMockData = mockData[groupKey];
-          const hierarchy = window.MockData.organizationHierarchy[groupKey];
-          
-          Object.keys(groupMockData.teams).forEach(teamKey => {
-            const teamMockData = groupMockData.teams[teamKey];
-            
-            if (teamMockData.subTeams) {
-              Object.keys(teamMockData.subTeams).forEach(subTeamKey => {
-                teams.push({
-                  data: teamMockData.subTeams[subTeamKey],
-                  label: `${hierarchy.name} › ${teamKey} › ${subTeamKey}`,
-                  path: [groupKey, teamKey, subTeamKey]
-                });
-              });
-            } else {
-              teams.push({
-                data: teamMockData,
-                label: `${hierarchy.name} › ${teamKey}`,
-                path: [groupKey, teamKey]
-              });
-            }
-          });
-        });
-      } else if (current.type === 'group') {
-        // Group level: get all teams in this group
-        const groupKey = navigationPath[0];
-        const groupMockData = mockData[groupKey];
-        
-        if (groupMockData && groupMockData.teams) {
-          Object.keys(groupMockData.teams).forEach(teamKey => {
-            const teamMockData = groupMockData.teams[teamKey];
-            
-            if (teamMockData.subTeams) {
-              Object.keys(teamMockData.subTeams).forEach(subTeamKey => {
-                teams.push({
-                  data: teamMockData.subTeams[subTeamKey],
-                  label: `${teamKey} › ${subTeamKey}`,
-                  path: [groupKey, teamKey, subTeamKey]
-                });
-              });
-            } else {
-              teams.push({
-                data: teamMockData,
-                label: teamKey,
-                path: [groupKey, teamKey]
-              });
-            }
-          });
-        }
-      } else if (current.type === 'team') {
-        // Team level: get this team or its sub-teams
-        const groupKey = navigationPath[0];
-        const teamKey = navigationPath[1];
-        const groupMockData = mockData[groupKey];
-        
-        if (groupMockData && groupMockData.teams && groupMockData.teams[teamKey]) {
-          const teamMockData = groupMockData.teams[teamKey];
-          
-          if (teamMockData.subTeams) {
-            Object.keys(teamMockData.subTeams).forEach(subTeamKey => {
-              teams.push({
-                data: teamMockData.subTeams[subTeamKey],
-                label: subTeamKey,
-                path: [groupKey, teamKey, subTeamKey]
-              });
-            });
-          } else {
-            teams.push({
-              data: teamMockData,
-              label: teamKey,
-              path: [groupKey, teamKey]
-            });
-          }
-        }
-      } else if (current.type === 'sub-team') {
-        // Sub-team level: just this sub-team
-        const groupKey = navigationPath[0];
-        const teamKey = navigationPath[1];
-        const subTeamKey = navigationPath[2];
-        const groupMockData = mockData[groupKey];
-        
-        if (groupMockData && groupMockData.teams && groupMockData.teams[teamKey] && 
-            groupMockData.teams[teamKey].subTeams && groupMockData.teams[teamKey].subTeams[subTeamKey]) {
-          teams.push({
-            data: groupMockData.teams[teamKey].subTeams[subTeamKey],
-            label: subTeamKey,
-            path: [groupKey, teamKey, subTeamKey]
-          });
-        }
-      }
-      
-      return teams;
-    }
+    // Build team label from path
+    const buildTeamLabel = (path) => {
+      if (path.length === 0) return '';
+      return path.join(' › ');
+    };
     
-    // Use the shared function from scorecard-compute.js
-    const teamsToProcess = getTeamsToProcess();
+    // Convert leaf nodes to format expected by calculateOpportunitiesForTeams
+    const teamsToProcess = leafNodes.map(leaf => ({
+      data: leaf.rawData,
+      label: buildTeamLabel(leaf.path),
+      path: leaf.path
+    }));
+    
     return compute.calculateOpportunitiesForTeams(teamsToProcess, config, normMethods, 5);
   }
 
@@ -1629,225 +1375,55 @@
   // ========== RENDER FUNCTIONS ==========
   function renderBreadcrumb() {
     const breadcrumbEl = document.getElementById('breadcrumb');
+    const path = currentNode.path;
     
-    if (navigationPath.length === 0) {
+    if (path.length === 0) {
       breadcrumbEl.innerHTML = '<span class="breadcrumb-current">R&D Groups</span>';
-    } else if (navigationPath.length === 1) {
-      const groupName = organizationData[navigationPath[0]].name;
-      breadcrumbEl.innerHTML = `
-        <a href="#" class="breadcrumb-link" onclick="navigateToTopLevel(); return false;">R&D</a>
-        <span class="breadcrumb-separator">›</span>
-        <span class="breadcrumb-current">${groupName}</span>
-      `;
-    } else if (navigationPath.length === 2) {
-      const groupName = organizationData[navigationPath[0]].name;
-      const teamName = navigationPath[1];
-      breadcrumbEl.innerHTML = `
-        <a href="#" class="breadcrumb-link" onclick="navigateToTopLevel(); return false;">R&D</a>
-        <span class="breadcrumb-separator">›</span>
-        <a href="#" class="breadcrumb-link" onclick="navigateToGroup('${navigationPath[0]}'); return false;">${groupName}</a>
-        <span class="breadcrumb-separator">›</span>
-        <span class="breadcrumb-current">${teamName}</span>
-      `;
-    } else if (navigationPath.length === 3) {
-      const groupName = organizationData[navigationPath[0]].name;
-      const teamName = navigationPath[1];
-      const subTeamName = navigationPath[2];
-      breadcrumbEl.innerHTML = `
-        <a href="#" class="breadcrumb-link" onclick="navigateToTopLevel(); return false;">R&D</a>
-        <span class="breadcrumb-separator">›</span>
-        <a href="#" class="breadcrumb-link" onclick="navigateToGroup('${navigationPath[0]}'); return false;">${groupName}</a>
-        <span class="breadcrumb-separator">›</span>
-        <a href="#" class="breadcrumb-link" onclick="navigateToTeam('${navigationPath[0]}', '${navigationPath[1]}'); return false;">${teamName}</a>
-        <span class="breadcrumb-separator">›</span>
-        <span class="breadcrumb-current">${subTeamName}</span>
-      `;
+      return;
     }
-  }
-
-  function getCurrentData() {
-    if (navigationPath.length === 0) {
-      // Top-level: all groups
-      return { type: 'top-level', data: organizationData };
-    } else if (navigationPath.length === 1) {
-      // Group level
-      return { type: 'group', data: organizationData[navigationPath[0]] };
-    } else if (navigationPath.length === 2) {
-      // Team level
-      const group = organizationData[navigationPath[0]];
-      const team = group.teams[navigationPath[1]];
-      return { type: 'team', data: team, parentData: group };
-    } else if (navigationPath.length === 3) {
-      // Sub-team level (leaf)
-      const group = organizationData[navigationPath[0]];
-      const team = group.teams[navigationPath[1]];
-      const subTeam = team.subTeams[navigationPath[2]];
-      return { type: 'sub-team', data: subTeam, teamName: navigationPath[2] };
-    }
+    
+    // Build breadcrumb trail
+    let html = '<a href="#" class="breadcrumb-link" onclick="navigateTo([]); return false;">R&D</a>';
+    
+    // Add each level of the path
+    path.forEach((segment, index) => {
+      html += '<span class="breadcrumb-separator">›</span>';
+      
+      const segmentPath = path.slice(0, index + 1);
+      const node = OrgTree.getNodeByPath(orgTree, segmentPath);
+      const name = node ? node.name : segment;
+      
+      if (index === path.length - 1) {
+        // Current (last) segment
+        html += `<span class="breadcrumb-current">${escapeHtml(name)}</span>`;
+      } else {
+        // Clickable parent segment
+        const pathJson = JSON.stringify(segmentPath);
+        html += `<a href="#" class="breadcrumb-link" onclick='navigateTo(${pathJson}); return false;'>${escapeHtml(name)}</a>`;
+      }
+    });
+    
+    breadcrumbEl.innerHTML = html;
   }
 
   function renderHeroGrade() {
     const container = document.getElementById('heroGradeContainer');
-    const current = getCurrentData();
+    const ownership = getOwnershipInfo();
+    const avg = calculateAverageScore(currentNode);
+    const trend = calculateAverageTrend(currentNode);
+    const avgClass = getScoreClass(avg);
+    const letterGrade = getLetterGrade(avg);
+    const safeId = currentNode.name.replace(/[^a-zA-Z0-9]/g, '-');
     
-    if (current.type === 'top-level') {
-      // Calculate overall R&D grade
-      const topLevelGroups = Object.keys(organizationData);
-      let totalScore = 0;
-      let totalTrendScores = [0, 0, 0, 0];
-      
-      topLevelGroups.forEach(groupKey => {
-        const group = organizationData[groupKey];
-        const avg = calculateAverage(group);
-        totalScore += avg;
-        
-        const trend = calculateAverageTrend(group);
-        trend.forEach((val, i) => {
-          totalTrendScores[i] += val;
-        });
-      });
-      
-      const overallAvg = Math.round(totalScore / topLevelGroups.length);
-      const overallTrend = totalTrendScores.map(t => Math.round(t / topLevelGroups.length));
-      const avgClass = getScoreClass(overallAvg);
-      const letterGrade = getLetterGrade(overallAvg);
-      
-      container.innerHTML = `
-        <div class="hero-section-wrapper">
-          <div class="hero-section">
-            <div class="hero-grade">
-              <div class="hero-grade-title">R&D</div>
-              <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
-              <div class="hero-grade-score">${overallAvg}/100</div>
-              <div class="hero-sparkline-container">
-                <canvas id="chart-hero-grade"></canvas>
-              </div>
-            </div>
-            <div class="priority-work-panel">
-              <h3 class="priority-work-title">Top 5 Opportunities</h3>
-              <div class="priority-work-items">
-                ${renderPriorityWork()}
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      // Create hero sparkline
-      setTimeout(() => {
-        createSparkline('chart-hero-grade', overallTrend, overallAvg);
-      }, 0);
-    } else if (current.type === 'group') {
-      const ownership = getOwnershipInfo();
-      // Show specific group grade
-      const group = current.data;
-      const avg = calculateAverage(group);
-      const trend = calculateAverageTrend(group);
-      const avgClass = getScoreClass(avg);
-      const letterGrade = getLetterGrade(avg);
-      
-      container.innerHTML = `
-        <div class="hero-section-wrapper">
-          <div class="hero-section">
-            <div class="hero-grade">
-              ${renderOwnershipHtml(ownership)}
-              <div class="hero-grade-title">${group.name}</div>
-              <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
-              <div class="hero-grade-score">${avg}/100</div>
-              <div class="hero-sparkline-container">
-                <canvas id="chart-hero-grade"></canvas>
-              </div>
-            </div>
-            <div class="priority-work-panel">
-              <h3 class="priority-work-title">Top 5 Opportunities</h3>
-              <div class="priority-work-items">
-                ${renderPriorityWork()}
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      // Create hero sparkline
-      setTimeout(() => {
-        createSparkline('chart-hero-grade', trend, avg);
-      }, 0);
-    } else if (current.type === 'team') {
-      const ownership = getOwnershipInfo();
-      // Show specific team grade
-      const team = current.data;
-      const teamName = navigationPath[1];
-      const metrics = team.metrics;
-      const scores = [metrics.slos.score, metrics.vulns.score, metrics.bugs.score, metrics.postmortems.score];
-      const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-      
-      // Calculate trend
-      const avgTrend = [];
-      for (let i = 0; i < 4; i++) {
-        avgTrend.push(Math.round(
-          (metrics.slos.trend[i] + metrics.vulns.trend[i] + 
-           metrics.bugs.trend[i] + metrics.postmortems.trend[i]) / 4
-        ));
-      }
-      
-      const avgClass = getScoreClass(avg);
-      const letterGrade = getLetterGrade(avg);
-      
-      container.innerHTML = `
-        <div class="hero-section-wrapper">
-          <div class="hero-section">
-            <div class="hero-grade">
-              ${renderOwnershipHtml(ownership)}
-              <div class="hero-grade-title">${teamName}</div>
-              <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
-              <div class="hero-grade-score">${avg}/100</div>
-              <div class="hero-sparkline-container">
-                <canvas id="chart-hero-grade"></canvas>
-              </div>
-            </div>
-            <div class="priority-work-panel">
-              <h3 class="priority-work-title">Top 5 Opportunities</h3>
-              <div class="priority-work-items">
-                ${renderPriorityWork()}
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      // Create hero sparkline
-      setTimeout(() => {
-        createSparkline('chart-hero-grade', avgTrend, avg);
-      }, 0);
-    } else if (current.type === 'sub-team') {
-      const ownership = getOwnershipInfo();
-      // Show specific sub-team grade (leaf node - hero only)
-      const subTeam = current.data;
-      const subTeamName = current.teamName;
-      const metrics = subTeam.metrics;
-      const scores = [metrics.slos.score, metrics.vulns.score, metrics.bugs.score, metrics.postmortems.score];
-      const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-      
-      // Calculate trend
-      const avgTrend = [];
-      for (let i = 0; i < 4; i++) {
-        avgTrend.push(Math.round(
-          (metrics.slos.trend[i] + metrics.vulns.trend[i] + 
-           metrics.bugs.trend[i] + metrics.postmortems.trend[i]) / 4
-        ));
-      }
-      
-      const avgClass = getScoreClass(avg);
-      const letterGrade = getLetterGrade(avg);
-      const safeId = subTeamName.replace(/[^a-zA-Z0-9]/g, '-');
-      
+    // Leaf nodes show inline trend chart, non-leaf show sparkline
+    if (currentNode.isLeaf) {
       container.innerHTML = `
         <div class="hero-section-wrapper">
           <div class="hero-section-subteam">
             <div class="hero-left-column">
               <div class="hero-grade-compact">
                 ${renderOwnershipHtml(ownership)}
-                <div class="hero-grade-title">${subTeamName}</div>
+                <div class="hero-grade-title">${escapeHtml(currentNode.name)}</div>
                 <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
                 <div class="hero-grade-score">${avg}/100</div>
               </div>
@@ -1868,23 +1444,58 @@
         </div>
       `;
       
-      // Create trend chart
+      // Create full trend chart for leaf
       setTimeout(() => {
-        createFullLineChart(`chart-trend-${safeId}`, metrics);
+        createFullLineChart(`chart-trend-${safeId}`, currentNode.metrics);
+      }, 0);
+    } else {
+      // Non-leaf: standard hero with sparkline
+      container.innerHTML = `
+        <div class="hero-section-wrapper">
+          <div class="hero-section">
+            <div class="hero-grade">
+              ${renderOwnershipHtml(ownership)}
+              <div class="hero-grade-title">${escapeHtml(currentNode.name)}</div>
+              <div class="hero-grade-badge ${avgClass}">${letterGrade}</div>
+              <div class="hero-grade-score">${avg}/100</div>
+              <div class="hero-sparkline-container">
+                <canvas id="chart-hero-grade"></canvas>
+              </div>
+            </div>
+            <div class="priority-work-panel">
+              <h3 class="priority-work-title">Top 5 Opportunities</h3>
+              <div class="priority-work-items">
+                ${renderPriorityWork()}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Create hero sparkline
+      setTimeout(() => {
+        createSparkline('chart-hero-grade', trend, avg);
       }, 0);
     }
   }
 
 
-  function renderTopLevel() {
-    const topLevelGroups = Object.keys(organizationData);
+  function renderTable() {
+    // If current node is a leaf, don't render table (hero has all info)
+    if (currentNode.isLeaf) {
+      document.getElementById('tableContainer').innerHTML = '';
+      return;
+    }
+    
+    const children = currentNode.children;
+    const childLabel = OrgTree.getChildLevelLabel(currentNode.level);
     
     let html = `
       <div class="scorecard-table">
         <table>
           <thead>
             <tr>
-              <th>Group</th>
+              <th>${childLabel}</th>
               <th>SLOs</th>
               <th>Vulns</th>
               <th>Bugs</th>
@@ -1894,174 +1505,58 @@
           <tbody>
     `;
 
-    topLevelGroups.forEach(groupKey => {
-      const group = organizationData[groupKey];
-      const avg = calculateAverage(group);
+    children.forEach(child => {
+      const avg = calculateAverageScore(child);
       const avgClass = getScoreClass(avg);
       const letterGrade = getLetterGrade(avg);
-      const avgTrend = calculateAverageTrend(group);
+      const avgTrend = calculateAverageTrend(child);
+      const safeId = child.path.join('-');
+      const pathJson = JSON.stringify(child.path);
+      const drillIcon = child.isLeaf ? '' : '<span class="drill-down-icon">›</span>';
       
       html += `
-        <tr class="clickable" onclick="navigateToGroup('${groupKey}')">
+        <tr class="clickable" onclick='navigateTo(${pathJson})'>
           <td class="metric-cell">
             <div class="metric-content">
               <div class="group-name" style="text-align: center; margin-bottom: 8px;">
-                ${group.name}
-                <span class="drill-down-icon">›</span>
-              </div>
-              <div class="grade-badge ${avgClass}">${letterGrade}</div>
-              <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-grade"></canvas>
-              </div>
-            </div>
-          </td>
-          <td class="metric-cell">
-            <div class="metric-content">
-              <div class="score-badge ${getScoreClass(group.metrics.slos.score)}">${group.metrics.slos.score}</div>
-              <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-slos"></canvas>
-              </div>
-            </div>
-          </td>
-          <td class="metric-cell">
-            <div class="metric-content">
-              <div class="score-badge ${getScoreClass(group.metrics.vulns.score)}">${group.metrics.vulns.score}</div>
-              <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-vulns"></canvas>
-              </div>
-            </div>
-          </td>
-          <td class="metric-cell">
-            <div class="metric-content">
-              <div class="score-badge ${getScoreClass(group.metrics.bugs.score)}">${group.metrics.bugs.score}</div>
-              <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-bugs"></canvas>
-              </div>
-            </div>
-          </td>
-          <td class="metric-cell">
-            <div class="metric-content">
-              <div class="score-badge ${getScoreClass(group.metrics.postmortems.score)}">${group.metrics.postmortems.score}</div>
-              <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-postmortems"></canvas>
-              </div>
-            </div>
-          </td>
-        </tr>
-      `;
-    });
-
-    html += `
-          </tbody>
-        </table>
-      </div>
-    `;
-
-    document.getElementById('tableContainer').innerHTML = html;
-
-    // Create sparklines
-    setTimeout(() => {
-      topLevelGroups.forEach(groupKey => {
-        const group = organizationData[groupKey];
-        const avg = calculateAverage(group);
-        const avgTrend = calculateAverageTrend(group);
-        createSparkline(`chart-${groupKey}-grade`, avgTrend, avg);
-        createSparkline(`chart-${groupKey}-slos`, group.metrics.slos.trend, group.metrics.slos.score);
-        createSparkline(`chart-${groupKey}-vulns`, group.metrics.vulns.trend, group.metrics.vulns.score);
-        createSparkline(`chart-${groupKey}-bugs`, group.metrics.bugs.trend, group.metrics.bugs.score);
-        createSparkline(`chart-${groupKey}-postmortems`, group.metrics.postmortems.trend, group.metrics.postmortems.score);
-      });
-    }, 0);
-  }
-
-  function renderGroupDetail(groupKey) {
-    const group = organizationData[groupKey];
-    const teams = group.teams;
-    const teamKeys = Object.keys(teams);
-
-    let html = `
-      <div class="scorecard-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Team</th>
-              <th>SLOs</th>
-              <th>Vulns</th>
-              <th>Bugs</th>
-              <th>Postmortems</th>
-            </tr>
-          </thead>
-          <tbody>
-    `;
-
-    teamKeys.forEach(teamKey => {
-      const team = teams[teamKey];
-      const metrics = team.metrics;
-      const scores = [
-        metrics.slos.score,
-        metrics.vulns.score,
-        metrics.bugs.score,
-        metrics.postmortems.score
-      ];
-      const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-      const avgClass = getScoreClass(avg);
-      const letterGrade = getLetterGrade(avg);
-      const avgTrend = [];
-      for (let i = 0; i < 4; i++) {
-        avgTrend.push(Math.round(
-          (metrics.slos.trend[i] + metrics.vulns.trend[i] + 
-           metrics.bugs.trend[i] + metrics.postmortems.trend[i]) / 4
-        ));
-      }
-      
-      const hasSubTeams = team.subTeams && Object.keys(team.subTeams).length > 0;
-      const clickableClass = 'clickable';
-      const clickHandler = `onclick="navigateToTeam('${groupKey}', '${teamKey}')"`;
-      const drillIcon = hasSubTeams ? '<span class="drill-down-icon">›</span>' : '';
-      
-      html += `
-        <tr class="${clickableClass}" ${clickHandler}>
-          <td class="metric-cell">
-            <div class="metric-content">
-              <div class="group-name" style="text-align: center; margin-bottom: 8px;">
-                ${teamKey}
+                ${escapeHtml(child.name)}
                 ${drillIcon}
               </div>
               <div class="grade-badge ${avgClass}">${letterGrade}</div>
               <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-${teamKey}-grade"></canvas>
+                <canvas id="chart-${safeId}-grade"></canvas>
               </div>
             </div>
           </td>
           <td class="metric-cell">
             <div class="metric-content">
-              <div class="score-badge ${getScoreClass(metrics.slos.score)}">${metrics.slos.score}</div>
+              <div class="score-badge ${getScoreClass(child.metrics.slos.score)}">${child.metrics.slos.score}</div>
               <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-${teamKey}-slos"></canvas>
+                <canvas id="chart-${safeId}-slos"></canvas>
               </div>
             </div>
           </td>
           <td class="metric-cell">
             <div class="metric-content">
-              <div class="score-badge ${getScoreClass(metrics.vulns.score)}">${metrics.vulns.score}</div>
+              <div class="score-badge ${getScoreClass(child.metrics.vulns.score)}">${child.metrics.vulns.score}</div>
               <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-${teamKey}-vulns"></canvas>
+                <canvas id="chart-${safeId}-vulns"></canvas>
               </div>
             </div>
           </td>
           <td class="metric-cell">
             <div class="metric-content">
-              <div class="score-badge ${getScoreClass(metrics.bugs.score)}">${metrics.bugs.score}</div>
+              <div class="score-badge ${getScoreClass(child.metrics.bugs.score)}">${child.metrics.bugs.score}</div>
               <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-${teamKey}-bugs"></canvas>
+                <canvas id="chart-${safeId}-bugs"></canvas>
               </div>
             </div>
           </td>
           <td class="metric-cell">
             <div class="metric-content">
-              <div class="score-badge ${getScoreClass(metrics.postmortems.score)}">${metrics.postmortems.score}</div>
+              <div class="score-badge ${getScoreClass(child.metrics.postmortems.score)}">${child.metrics.postmortems.score}</div>
               <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-${teamKey}-postmortems"></canvas>
+                <canvas id="chart-${safeId}-postmortems"></canvas>
               </div>
             </div>
           </td>
@@ -2079,133 +1574,16 @@
 
     // Create sparklines
     setTimeout(() => {
-      teamKeys.forEach(teamKey => {
-        const team = teams[teamKey];
-        const metrics = team.metrics;
-        const scores = [metrics.slos.score, metrics.vulns.score, metrics.bugs.score, metrics.postmortems.score];
-        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-        const avgTrend = [];
-        for (let i = 0; i < 4; i++) {
-          avgTrend.push(Math.round(
-            (metrics.slos.trend[i] + metrics.vulns.trend[i] + 
-             metrics.bugs.trend[i] + metrics.postmortems.trend[i]) / 4
-          ));
-        }
-        createSparkline(`chart-${groupKey}-${teamKey}-grade`, avgTrend, avg);
-        createSparkline(`chart-${groupKey}-${teamKey}-slos`, metrics.slos.trend, metrics.slos.score);
-        createSparkline(`chart-${groupKey}-${teamKey}-vulns`, metrics.vulns.trend, metrics.vulns.score);
-        createSparkline(`chart-${groupKey}-${teamKey}-bugs`, metrics.bugs.trend, metrics.bugs.score);
-        createSparkline(`chart-${groupKey}-${teamKey}-postmortems`, metrics.postmortems.trend, metrics.postmortems.score);
+      children.forEach(child => {
+        const avg = calculateAverageScore(child);
+        const avgTrend = calculateAverageTrend(child);
+        const safeId = child.path.join('-');
+        createSparkline(`chart-${safeId}-grade`, avgTrend, avg);
+        createSparkline(`chart-${safeId}-slos`, child.metrics.slos.trend, child.metrics.slos.score);
+        createSparkline(`chart-${safeId}-vulns`, child.metrics.vulns.trend, child.metrics.vulns.score);
+        createSparkline(`chart-${safeId}-bugs`, child.metrics.bugs.trend, child.metrics.bugs.score);
+        createSparkline(`chart-${safeId}-postmortems`, child.metrics.postmortems.trend, child.metrics.postmortems.score);
       });
-    }, 0);
-  }
-
-  function renderSingleTeamTable(teamName, metrics) {
-    const scores = [
-      metrics.slos.score,
-      metrics.vulns.score,
-      metrics.bugs.score,
-      metrics.postmortems.score
-    ];
-    const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-    const avgClass = getScoreClass(avg);
-    const letterGrade = getLetterGrade(avg);
-    const avgTrend = [];
-    for (let i = 0; i < 4; i++) {
-      avgTrend.push(Math.round(
-        (metrics.slos.trend[i] + metrics.vulns.trend[i] + 
-         metrics.bugs.trend[i] + metrics.postmortems.trend[i]) / 4
-      ));
-    }
-
-    // Sanitize teamName for use in canvas IDs (replace spaces and special chars)
-    const safeId = teamName.replace(/[^a-zA-Z0-9]/g, '-');
-
-    // Trend chart is now shown inline in the hero section for leaf pages
-    const isLeafPage = navigationPath.length >= 2;
-    const trendChartHtml = isLeafPage ? '' : `
-      <div class="trend-chart-container">
-        <div class="trend-chart-title">Metrics Trend</div>
-        <div class="trend-chart-canvas">
-          <canvas id="chart-trend-${safeId}"></canvas>
-        </div>
-      </div>
-    `;
-
-    const html = `
-      ${trendChartHtml}
-      <div class="scorecard-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Sub-Team</th>
-              <th>SLOs</th>
-              <th>Vulns</th>
-              <th>Bugs</th>
-              <th>Postmortems</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="metric-cell">
-                <div class="metric-content">
-                  <div class="group-name" style="text-align: center; margin-bottom: 8px;">${teamName}</div>
-                  <div class="grade-badge ${avgClass}">${letterGrade}</div>
-                  <div class="sparkline-container">
-                    <canvas id="chart-single-${safeId}-grade"></canvas>
-                  </div>
-                </div>
-              </td>
-              <td class="metric-cell">
-                <div class="metric-content">
-                  <div class="score-badge ${getScoreClass(metrics.slos.score)}">${metrics.slos.score}</div>
-                  <div class="sparkline-container">
-                    <canvas id="chart-single-${safeId}-slos"></canvas>
-                  </div>
-                </div>
-              </td>
-              <td class="metric-cell">
-                <div class="metric-content">
-                  <div class="score-badge ${getScoreClass(metrics.vulns.score)}">${metrics.vulns.score}</div>
-                  <div class="sparkline-container">
-                    <canvas id="chart-single-${safeId}-vulns"></canvas>
-                  </div>
-                </div>
-              </td>
-              <td class="metric-cell">
-                <div class="metric-content">
-                  <div class="score-badge ${getScoreClass(metrics.bugs.score)}">${metrics.bugs.score}</div>
-                  <div class="sparkline-container">
-                    <canvas id="chart-single-${safeId}-bugs"></canvas>
-                  </div>
-                </div>
-              </td>
-              <td class="metric-cell">
-                <div class="metric-content">
-                  <div class="score-badge ${getScoreClass(metrics.postmortems.score)}">${metrics.postmortems.score}</div>
-                  <div class="sparkline-container">
-                    <canvas id="chart-single-${safeId}-postmortems"></canvas>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    `;
-
-    document.getElementById('tableContainer').innerHTML = html;
-
-    // Create trend chart (only if not on leaf page) and sparklines
-    setTimeout(() => {
-      if (!isLeafPage) {
-        createFullLineChart(`chart-trend-${safeId}`, metrics);
-      }
-      createSparkline(`chart-single-${safeId}-grade`, avgTrend, avg);
-      createSparkline(`chart-single-${safeId}-slos`, metrics.slos.trend, metrics.slos.score);
-      createSparkline(`chart-single-${safeId}-vulns`, metrics.vulns.trend, metrics.vulns.score);
-      createSparkline(`chart-single-${safeId}-bugs`, metrics.bugs.trend, metrics.bugs.score);
-      createSparkline(`chart-single-${safeId}-postmortems`, metrics.postmortems.trend, metrics.postmortems.score);
     }, 0);
   }
 
@@ -2221,137 +1599,7 @@
     renderBreadcrumb();
     updateHeaderButtons();
     renderHeroGrade();
-    
-    if (navigationPath.length === 0) {
-      renderTopLevel();
-    } else if (navigationPath.length === 1) {
-      renderGroupDetail(navigationPath[0]);
-    } else if (navigationPath.length === 2) {
-      // Check if this team has sub-teams
-      const group = organizationData[navigationPath[0]];
-      const team = group.teams[navigationPath[1]];
-      if (team.subTeams && Object.keys(team.subTeams).length > 0) {
-        renderTeamDetail(navigationPath[0], navigationPath[1]);
-      } else {
-        // Leaf node at team level - show single team table
-        renderSingleTeamTable(navigationPath[1], team.metrics);
-      }
-    } else if (navigationPath.length === 3) {
-      // Leaf node at sub-team level - no table needed, hero section has all info
-      document.getElementById('tableContainer').innerHTML = '';
-    }
-  }
-
-  function renderTeamDetail(groupKey, teamKey) {
-    const group = organizationData[groupKey];
-    const team = group.teams[teamKey];
-    const subTeams = team.subTeams;
-    const subTeamKeys = Object.keys(subTeams);
-
-    let html = `
-      <div class="scorecard-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Sub-Team</th>
-              <th>SLOs</th>
-              <th>Vulns</th>
-              <th>Bugs</th>
-              <th>Postmortems</th>
-            </tr>
-          </thead>
-          <tbody>
-    `;
-
-    subTeamKeys.forEach(subTeamKey => {
-      const subTeam = subTeams[subTeamKey];
-      const metrics = subTeam.metrics;
-      const scores = [
-        metrics.slos.score,
-        metrics.vulns.score,
-        metrics.bugs.score,
-        metrics.postmortems.score
-      ];
-      const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-      const avgClass = getScoreClass(avg);
-      const letterGrade = getLetterGrade(avg);
-      
-      html += `
-        <tr class="clickable" onclick="navigateToSubTeam('${groupKey}', '${teamKey}', '${subTeamKey}')">
-          <td class="metric-cell">
-            <div class="metric-content">
-              <div class="group-name" style="text-align: center; margin-bottom: 8px;">${subTeamKey}</div>
-              <div class="grade-badge ${avgClass}">${letterGrade}</div>
-              <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-${teamKey}-${subTeamKey}-grade"></canvas>
-              </div>
-            </div>
-          </td>
-          <td class="metric-cell">
-            <div class="metric-content">
-              <div class="score-badge ${getScoreClass(metrics.slos.score)}">${metrics.slos.score}</div>
-              <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-${teamKey}-${subTeamKey}-slos"></canvas>
-              </div>
-            </div>
-          </td>
-          <td class="metric-cell">
-            <div class="metric-content">
-              <div class="score-badge ${getScoreClass(metrics.vulns.score)}">${metrics.vulns.score}</div>
-              <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-${teamKey}-${subTeamKey}-vulns"></canvas>
-              </div>
-            </div>
-          </td>
-          <td class="metric-cell">
-            <div class="metric-content">
-              <div class="score-badge ${getScoreClass(metrics.bugs.score)}">${metrics.bugs.score}</div>
-              <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-${teamKey}-${subTeamKey}-bugs"></canvas>
-              </div>
-            </div>
-          </td>
-          <td class="metric-cell">
-            <div class="metric-content">
-              <div class="score-badge ${getScoreClass(metrics.postmortems.score)}">${metrics.postmortems.score}</div>
-              <div class="sparkline-container">
-                <canvas id="chart-${groupKey}-${teamKey}-${subTeamKey}-postmortems"></canvas>
-              </div>
-            </div>
-          </td>
-        </tr>
-      `;
-    });
-
-    html += `
-          </tbody>
-        </table>
-      </div>
-    `;
-
-    document.getElementById('tableContainer').innerHTML = html;
-
-    // Create sparklines
-    setTimeout(() => {
-      subTeamKeys.forEach(subTeamKey => {
-        const subTeam = subTeams[subTeamKey];
-        const metrics = subTeam.metrics;
-        const scores = [metrics.slos.score, metrics.vulns.score, metrics.bugs.score, metrics.postmortems.score];
-        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-        const avgTrend = [];
-        for (let i = 0; i < 4; i++) {
-          avgTrend.push(Math.round(
-            (metrics.slos.trend[i] + metrics.vulns.trend[i] + 
-             metrics.bugs.trend[i] + metrics.postmortems.trend[i]) / 4
-          ));
-        }
-        createSparkline(`chart-${groupKey}-${teamKey}-${subTeamKey}-grade`, avgTrend, avg);
-        createSparkline(`chart-${groupKey}-${teamKey}-${subTeamKey}-slos`, metrics.slos.trend, metrics.slos.score);
-        createSparkline(`chart-${groupKey}-${teamKey}-${subTeamKey}-vulns`, metrics.vulns.trend, metrics.vulns.score);
-        createSparkline(`chart-${groupKey}-${teamKey}-${subTeamKey}-bugs`, metrics.bugs.trend, metrics.bugs.score);
-        createSparkline(`chart-${groupKey}-${teamKey}-${subTeamKey}-postmortems`, metrics.postmortems.trend, metrics.postmortems.score);
-      });
-    }, 0);
+    renderTable();
   }
 
   // ========== NAVIGATION ==========
@@ -2364,55 +1612,45 @@
     }
     
     if (pushState) {
-      history.pushState({ navigationPath: path }, '', url);
+      history.pushState({ path: path }, '', url);
     } else {
-      history.replaceState({ navigationPath: path }, '', url);
+      history.replaceState({ path: path }, '', url);
     }
   }
 
-  function navigateToGroup(groupKey) {
-    navigationPath = [groupKey];
-    updateUrl(navigationPath);
-    render();
-  }
-
-  function navigateToTeam(groupKey, teamKey) {
-    navigationPath = [groupKey, teamKey];
-    updateUrl(navigationPath);
-    render();
-  }
-
-  function navigateToSubTeam(groupKey, teamKey, subTeamKey) {
-    navigationPath = [groupKey, teamKey, subTeamKey];
-    updateUrl(navigationPath);
-    render();
-  }
-
-  function navigateToTopLevel() {
-    navigationPath = [];
-    updateUrl(navigationPath);
-    render();
+  function navigateTo(path) {
+    const node = OrgTree.getNodeByPath(orgTree, path);
+    if (node) {
+      currentNode = node;
+      updateUrl(path);
+      render();
+    }
   }
 
   // Handle browser back/forward buttons
   window.addEventListener('popstate', (event) => {
-    if (event.state && event.state.navigationPath !== undefined) {
-      navigationPath = event.state.navigationPath;
+    let path = [];
+    
+    if (event.state && event.state.path !== undefined) {
+      path = event.state.path;
     } else {
       // Parse from URL if no state (e.g., initial page load)
       const urlParams = new URLSearchParams(window.location.search);
       const teamParam = urlParams.get('team');
       if (teamParam) {
         try {
-          navigationPath = JSON.parse(teamParam);
+          path = JSON.parse(teamParam);
         } catch (e) {
-          navigationPath = [];
+          path = [];
         }
-      } else {
-        navigationPath = [];
       }
     }
-    render();
+    
+    const node = OrgTree.getNodeByPath(orgTree, path);
+    if (node) {
+      currentNode = node;
+      render();
+    }
   });
 
   // ========== INITIALIZATION ==========
@@ -2420,19 +1658,17 @@
     // Check for team parameter in URL
     const urlParams = new URLSearchParams(window.location.search);
     const teamParam = urlParams.get('team');
+    let path = [];
     
     if (teamParam) {
       try {
         const teamPath = JSON.parse(decodeURIComponent(teamParam));
         if (Array.isArray(teamPath) && teamPath.length > 0) {
-          // Validate the path exists in organizationData
-          let valid = true;
-          if (teamPath[0] && !organizationData[teamPath[0]]) valid = false;
-          if (valid && teamPath[1] && !organizationData[teamPath[0]]?.teams?.[teamPath[1]]) valid = false;
-          if (valid && teamPath[2] && !organizationData[teamPath[0]]?.teams?.[teamPath[1]]?.subTeams?.[teamPath[2]]) valid = false;
-          
-          if (valid) {
-            navigationPath = teamPath;
+          // Validate the path exists in tree
+          const node = OrgTree.getNodeByPath(orgTree, teamPath);
+          if (node) {
+            path = teamPath;
+            currentNode = node;
           }
         }
       } catch (e) {
@@ -2441,7 +1677,7 @@
     }
     
     // Set initial history state so back button works from first navigation
-    updateUrl(navigationPath, false);
+    updateUrl(path, false);
     
     render();
   });
