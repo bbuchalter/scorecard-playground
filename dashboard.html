@@ -2237,11 +2237,8 @@
         renderSingleTeamTable(navigationPath[1], team.metrics);
       }
     } else if (navigationPath.length === 3) {
-      // Leaf node at sub-team level - show single team table
-      const group = organizationData[navigationPath[0]];
-      const team = group.teams[navigationPath[1]];
-      const subTeam = team.subTeams[navigationPath[2]];
-      renderSingleTeamTable(navigationPath[2], subTeam.metrics);
+      // Leaf node at sub-team level - no table needed, hero section has all info
+      document.getElementById('tableContainer').innerHTML = '';
     }
   }
 
