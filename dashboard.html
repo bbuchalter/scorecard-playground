@@ -1592,7 +1592,7 @@
       path: leaf.path
     }));
     
-    return compute.calculateOpportunitiesForTeams(teamsToProcess, config, normMethods, 5);
+    return compute.calculateOpportunitiesForTeams(teamsToProcess, config, normMethods);
   }
 
   function renderPriorityWork() {
@@ -1723,14 +1723,13 @@
               </div>
             </div>
             <div class="trend-chart-inline">
-              <div class="trend-chart-title">Metrics Trend</div>
               <div class="trend-chart-canvas">
                 <canvas id="chart-trend-${safeId}"></canvas>
               </div>
             </div>
           </div>
           <div class="priority-work-panel">
-            <h3 class="priority-work-title">Top 5 Opportunities</h3>
+            <h3 class="priority-work-title">Top Opportunities</h3>
             <div class="priority-work-items">
               ${renderPriorityWork()}
             </div>
