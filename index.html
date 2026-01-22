@@ -2699,6 +2699,7 @@ CALCULATION
   el.wP1.addEventListener("input", recompute);
   el.wP2.addEventListener("input", recompute);
   el.method.addEventListener("change", () => {
+    state.method = el.method.value;
     renderSloMethodParams();
     recompute();
   });
