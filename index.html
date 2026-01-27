@@ -1089,6 +1089,11 @@
         📊 Scorecard Dashboard
       </a>
 
+      <!-- Normalization Explorer Link -->
+      <a href="normalization-explorer.html" class="dashboard-link" id="normExplorerLink">
+        📈 Normalization Explorer
+      </a>
+
       <!-- Top Opportunities List -->
       <div class="priority-work">
         <h3 class="sidebar-title">Top 5 Opportunities</h3>
@@ -1908,6 +1913,211 @@
     bucket: { border: "#fdba74", bg: "rgba(253,186,116,0.1)" }
   };
 
+  // ---------- Shared Method Params Utilities ----------
+  // These utilities eliminate duplication across SLO, Vuln, Bug, and PM sections
+  
+  /**
+   * Renders method parameter inputs for any scoring category.
+   * @param {Object} config - Configuration object
+   * @param {string} config.prefix - ID prefix (e.g., "slo", "vuln", "bug", "pm")
+   * @param {Object} config.stateObj - The state object containing method and params
+   * @param {HTMLElement} config.containerEl - DOM element to render into
+   * @param {Function} config.recomputeFn - Function to call when params change
+   * @param {Function} [config.renderChartFn] - Optional chart render function
+   * @param {Object} [config.descriptions] - Optional custom descriptions per method
+   */
+  function renderMethodParams(config) {
+    const { prefix, stateObj, containerEl, recomputeFn, renderChartFn, descriptions = {} } = config;
+    
+    // Ensure method and params exist
+    if (!stateObj.method || !stateObj.params || !stateObj.params[stateObj.method]) {
+      stateObj.method = "exponential";
+      if (!stateObj.params) {
+        stateObj.params = {
+          exponential: { decay: 0.85 },
+          linear: { threshold: 10 },
+          inverse: { k: 1.0 },
+          logarithmic: { maxExpected: 20 },
+          sigmoid: { midpoint: 5, steepness: 1.0 },
+          bucket: { buckets: [[0, 1.0], [1, 0.8], [3, 0.5], [6, 0.2], [11, 0.0]] }
+        };
+      }
+    }
+    
+    const method = stateObj.method;
+    const params = stateObj.params[method];
+    const methodInfo = normMethods[method];
+    
+    // Default descriptions for each method type
+    const defaultDescriptions = {
+      exponential: "Each unit multiplies score by this",
+      linear: "Count at which score = 0",
+      inverse: "Higher = faster drop",
+      logarithmic: "Count at which score = 0",
+      sigmoid: { midpoint: "Count where score = 0.5", steepness: "Higher = sharper transition" },
+      bucket: "Bucket definitions (count threshold → score)"
+    };
+    const desc = { ...defaultDescriptions, ...descriptions };
+    
+    let html = "";
+    
+    if (method === "exponential") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Decay rate:</span>
+          <input type="number" id="${prefix}ParamDecay" step="0.05" min="0.1" max="0.99" value="${params.decay}" style="width: 80px;" />
+          <span class="muted small">${desc.exponential}</span>
+        </div>
+      `;
+    } else if (method === "linear") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Threshold:</span>
+          <input type="number" id="${prefix}ParamThreshold" step="1" min="1" value="${params.threshold}" style="width: 80px;" />
+          <span class="muted small">${desc.linear}</span>
+        </div>
+      `;
+    } else if (method === "inverse") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Steepness (k):</span>
+          <input type="number" id="${prefix}ParamK" step="0.1" min="0.1" value="${params.k}" style="width: 80px;" />
+          <span class="muted small">${desc.inverse}</span>
+        </div>
+      `;
+    } else if (method === "logarithmic") {
+      html = `
+        <div class="param-row">
+          <span class="param-label">Max expected:</span>
+          <input type="number" id="${prefix}ParamMax" step="1" min="1" value="${params.maxExpected}" style="width: 80px;" />
+          <span class="muted small">${desc.logarithmic}</span>
+        </div>
+      `;
+    } else if (method === "sigmoid") {
+      const sigmoidDesc = typeof desc.sigmoid === "object" ? desc.sigmoid : { midpoint: desc.sigmoid, steepness: "Higher = sharper transition" };
+      html = `
+        <div class="param-row">
+          <span class="param-label">Midpoint:</span>
+          <input type="number" id="${prefix}ParamMidpoint" step="1" min="1" value="${params.midpoint}" style="width: 80px;" />
+          <span class="muted small">${sigmoidDesc.midpoint}</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">Steepness:</span>
+          <input type="number" id="${prefix}ParamSteepness" step="0.1" min="0.1" value="${params.steepness}" style="width: 80px;" />
+          <span class="muted small">${sigmoidDesc.steepness}</span>
+        </div>
+      `;
+    } else if (method === "bucket") {
+      html = `
+        <div class="param-row">
+          <span class="muted small">${desc.bucket}:</span>
+        </div>
+        <div class="param-row" style="flex-wrap: wrap; gap: 6px;">
+          ${params.buckets.map(([t, s]) => `
+            <span class="mono" style="background: rgba(255,255,255,.1); padding: 4px 8px; border-radius: 6px;">
+              ${t}+ → ${fmt2(s)}
+            </span>
+          `).join("")}
+        </div>
+      `;
+    }
+    
+    // Add formula and examples display
+    html += `
+      <div class="formula-display" id="${prefix}ParamFormula">Formula: ${methodInfo.formula(params)}</div>
+      <div class="example-display" id="${prefix}ParamExample">Example: ${methodInfo.examples(params)}</div>
+    `;
+    
+    containerEl.innerHTML = html;
+    
+    // Attach event listeners
+    attachMethodParamListeners(config);
+  }
+  
+  /**
+   * Updates the formula and examples display for a category.
+   */
+  function updateFormulaDisplay(config) {
+    const { prefix, stateObj } = config;
+    const method = stateObj.method;
+    const params = stateObj.params[method];
+    const methodInfo = normMethods[method];
+    
+    const formulaEl = document.getElementById(`${prefix}ParamFormula`);
+    const exampleEl = document.getElementById(`${prefix}ParamExample`);
+    
+    if (formulaEl) formulaEl.textContent = `Formula: ${methodInfo.formula(params)}`;
+    if (exampleEl) exampleEl.textContent = `Example: ${methodInfo.examples(params)}`;
+  }
+  
+  /**
+   * Attaches event listeners to method parameter inputs.
+   */
+  function attachMethodParamListeners(config) {
+    const { prefix, stateObj, recomputeFn, renderChartFn } = config;
+    const method = stateObj.method;
+    
+    const handleChange = () => {
+      updateFormulaDisplay(config);
+      recomputeFn();
+      if (renderChartFn) renderChartFn();
+    };
+    
+    if (method === "exponential") {
+      const inp = document.getElementById(`${prefix}ParamDecay`);
+      if (inp) inp.addEventListener("input", () => {
+        stateObj.params.exponential.decay = Number(inp.value) || 0.85;
+        handleChange();
+      });
+    } else if (method === "linear") {
+      const inp = document.getElementById(`${prefix}ParamThreshold`);
+      if (inp) inp.addEventListener("input", () => {
+        stateObj.params.linear.threshold = Number(inp.value) || 10;
+        handleChange();
+      });
+    } else if (method === "inverse") {
+      const inp = document.getElementById(`${prefix}ParamK`);
+      if (inp) inp.addEventListener("input", () => {
+        stateObj.params.inverse.k = Number(inp.value) || 1;
+        handleChange();
+      });
+    } else if (method === "logarithmic") {
+      const inp = document.getElementById(`${prefix}ParamMax`);
+      if (inp) inp.addEventListener("input", () => {
+        stateObj.params.logarithmic.maxExpected = Number(inp.value) || 20;
+        handleChange();
+      });
+    } else if (method === "sigmoid") {
+      const mid = document.getElementById(`${prefix}ParamMidpoint`);
+      const steep = document.getElementById(`${prefix}ParamSteepness`);
+      if (mid) mid.addEventListener("input", () => {
+        stateObj.params.sigmoid.midpoint = Number(mid.value) || 5;
+        handleChange();
+      });
+      if (steep) steep.addEventListener("input", () => {
+        stateObj.params.sigmoid.steepness = Number(steep.value) || 1;
+        handleChange();
+      });
+    }
+    // Note: bucket method doesn't have editable inputs in the current implementation
+  }
+  
+  /**
+   * Sets up the method dropdown change handler for a category.
+   * @param {Object} config - Same config as renderMethodParams
+   * @param {HTMLElement} config.methodSelectEl - The method dropdown element
+   */
+  function setupMethodChangeHandler(config) {
+    const { stateObj, methodSelectEl, recomputeFn, renderChartFn } = config;
+    
+    methodSelectEl.addEventListener("change", () => {
+      stateObj.method = methodSelectEl.value;
+      renderMethodParams(config);
+      recomputeFn();
+      if (renderChartFn) renderChartFn();
+    });
+  }
+
   // ---------- Opportunity Calculation ----------
   // Calculate opportunities for each item across all categories
   // Uses the shared function from scorecard-compute.js
@@ -2502,98 +2712,23 @@
     }
   }
 
-  // ---------- Render SLO Method Params ----------
+  // ---------- SLO Method Params Config ----------
+  const sloMethodConfig = {
+    prefix: "slo",
+    stateObj: state,
+    containerEl: el.methodParams,
+    methodSelectEl: el.method,
+    recomputeFn: () => recompute(),
+    renderChartFn: () => renderSloChart(),
+    descriptions: {
+      exponential: "Lower = harsher penalty",
+      linear: "Score reaches zero at this negative EB%",
+      logarithmic: "Score reaches zero at this negative EB%"
+    }
+  };
+  
   function renderSloMethodParams() {
-    // Ensure method is set (handle old saved state)
-    if (!state.method || !state.params || !state.params[state.method]) {
-      state.method = "exponential";
-      if (!state.params) {
-        state.params = {
-          exponential: { decay: 0.85 },
-          linear: { threshold: 10 },
-          inverse: { k: 1.0 },
-          logarithmic: { maxExpected: 20 },
-          sigmoid: { midpoint: 5, steepness: 1.0 },
-          bucket: { buckets: [[0, 1.0], [1, 0.8], [3, 0.5], [6, 0.2], [11, 0.0]] }
-        };
-      }
-    }
-    
-    const method = state.method;
-    const params = state.params[method];
-    const methodInfo = normMethods[method];
-    
-    let html = "";
-    
-    if (method === "exponential") {
-      html = `
-        <div class="param-row">
-          <label>Decay rate (λ)
-            <input type="number" step="0.01" min="0" max="1" value="${params.decay}" 
-                   oninput="state.params.exponential.decay = Number(this.value); recompute(); renderSloChart();" />
-          </label>
-          <div class="muted" style="font-size: 12px;">Lower = harsher penalty. Examples: ${methodInfo.examples(params)}</div>
-        </div>
-      `;
-    } else if (method === "linear") {
-      html = `
-        <div class="param-row">
-          <label>Threshold
-            <input type="number" step="1" min="1" value="${params.threshold}" 
-                   oninput="state.params.linear.threshold = Number(this.value); recompute(); renderSloChart();" />
-          </label>
-          <div class="muted" style="font-size: 12px;">Score reaches zero at this negative EB%. Examples: ${methodInfo.examples(params)}</div>
-        </div>
-      `;
-    } else if (method === "inverse") {
-      html = `
-        <div class="param-row">
-          <label>k (steepness)
-            <input type="number" step="0.1" min="0.1" value="${params.k}" 
-                   oninput="state.params.inverse.k = Number(this.value); recompute(); renderSloChart();" />
-          </label>
-          <div class="muted" style="font-size: 12px;">Higher = steeper drop. Examples: ${methodInfo.examples(params)}</div>
-        </div>
-      `;
-    } else if (method === "logarithmic") {
-      html = `
-        <div class="param-row">
-          <label>Max expected
-            <input type="number" step="1" min="1" value="${params.maxExpected}" 
-                   oninput="state.params.logarithmic.maxExpected = Number(this.value); recompute(); renderSloChart();" />
-          </label>
-          <div class="muted" style="font-size: 12px;">Score reaches zero at this negative EB%. Examples: ${methodInfo.examples(params)}</div>
-        </div>
-      `;
-    } else if (method === "sigmoid") {
-      html = `
-        <div class="param-row">
-          <label>Midpoint
-            <input type="number" step="1" value="${params.midpoint}" 
-                   oninput="state.params.sigmoid.midpoint = Number(this.value); recompute(); renderSloChart();" />
-          </label>
-          <label>Steepness
-            <input type="number" step="0.1" value="${params.steepness}" 
-                   oninput="state.params.sigmoid.steepness = Number(this.value); recompute(); renderSloChart();" />
-          </label>
-          <div class="muted" style="font-size: 12px;">S-curve: score is 0.5 at midpoint. Examples: ${methodInfo.examples(params)}</div>
-        </div>
-      `;
-    } else if (method === "bucket") {
-      const bucketsJson = JSON.stringify(params.buckets);
-      html = `
-        <div class="param-row">
-          <label>Buckets (JSON: [[threshold, score], ...])
-            <input type="text" value='${bucketsJson}' 
-                   oninput="try { state.params.bucket.buckets = JSON.parse(this.value); recompute(); renderSloChart(); } catch(e) {}" 
-                   style="font-family: monospace; width: 100%;" />
-          </label>
-          <div class="muted" style="font-size: 12px;">Examples: ${methodInfo.examples(params)}</div>
-        </div>
-      `;
-    }
-    
-    el.methodParams.innerHTML = html;
+    renderMethodParams(sloMethodConfig);
   }
 
   // ---------- Compute ----------
@@ -2698,11 +2833,7 @@ CALCULATION
   el.wP0.addEventListener("input", recompute);
   el.wP1.addEventListener("input", recompute);
   el.wP2.addEventListener("input", recompute);
-  el.method.addEventListener("change", () => {
-    state.method = el.method.value;
-    renderSloMethodParams();
-    recompute();
-  });
+  setupMethodChangeHandler(sloMethodConfig);
   el.showAllMethods.addEventListener("change", () => {
     renderSloChart();
   });
@@ -2931,143 +3062,21 @@ CALCULATION
     vulnChart.update("none");
   }
 
-  // ---------- Render Method Params ----------
+  // ---------- Vuln Method Params Config ----------
+  const vulnMethodConfig = {
+    prefix: "vuln",
+    stateObj: vulnState,
+    containerEl: vulnEl.methodParams,
+    methodSelectEl: vulnEl.method,
+    recomputeFn: () => recomputeVuln(),
+    renderChartFn: () => renderVulnChart(),
+    descriptions: {
+      exponential: "Each vuln multiplies score by this"
+    }
+  };
+  
   function renderVulnMethodParams() {
-    const method = vulnState.method;
-    const params = vulnState.params[method];
-    const methodInfo = normMethods[method];
-    
-    let html = "";
-    
-    if (method === "exponential") {
-      html = `
-        <div class="param-row">
-          <span class="param-label">Decay rate:</span>
-          <input type="number" id="vulnParamDecay" step="0.05" min="0.1" max="0.99" value="${params.decay}" style="width: 80px;" />
-          <span class="muted small">Each vuln multiplies score by this</span>
-        </div>
-      `;
-    } else if (method === "linear") {
-      html = `
-        <div class="param-row">
-          <span class="param-label">Threshold:</span>
-          <input type="number" id="vulnParamThreshold" step="1" min="1" value="${params.threshold}" style="width: 80px;" />
-          <span class="muted small">Count at which score = 0</span>
-        </div>
-      `;
-    } else if (method === "inverse") {
-      html = `
-        <div class="param-row">
-          <span class="param-label">Steepness (k):</span>
-          <input type="number" id="vulnParamK" step="0.1" min="0.1" value="${params.k}" style="width: 80px;" />
-          <span class="muted small">Higher = faster drop</span>
-        </div>
-      `;
-    } else if (method === "logarithmic") {
-      html = `
-        <div class="param-row">
-          <span class="param-label">Max expected:</span>
-          <input type="number" id="vulnParamMax" step="1" min="1" value="${params.maxExpected}" style="width: 80px;" />
-          <span class="muted small">Count at which score = 0</span>
-        </div>
-      `;
-    } else if (method === "sigmoid") {
-      html = `
-        <div class="param-row">
-          <span class="param-label">Midpoint:</span>
-          <input type="number" id="vulnParamMidpoint" step="1" min="1" value="${params.midpoint}" style="width: 80px;" />
-          <span class="muted small">Count where score = 0.5</span>
-        </div>
-        <div class="param-row">
-          <span class="param-label">Steepness:</span>
-          <input type="number" id="vulnParamSteepness" step="0.1" min="0.1" value="${params.steepness}" style="width: 80px;" />
-          <span class="muted small">Higher = sharper transition</span>
-        </div>
-      `;
-    } else if (method === "bucket") {
-      html = `
-        <div class="param-row">
-          <span class="muted small">Bucket definitions (count threshold → score):</span>
-        </div>
-        <div class="param-row" style="flex-wrap: wrap; gap: 6px;">
-          ${params.buckets.map(([t, s], i) => `
-            <span class="mono" style="background: rgba(255,255,255,.1); padding: 4px 8px; border-radius: 6px;">
-              ${t}+ → ${fmt2(s)}
-            </span>
-          `).join("")}
-        </div>
-      `;
-    }
-    
-    // Add formula and examples
-    html += `
-      <div class="formula-display" id="vulnParamFormula">Formula: ${methodInfo.formula(params)}</div>
-      <div class="example-display" id="vulnParamExample">Example: ${methodInfo.examples(params)}</div>
-    `;
-    
-    vulnEl.methodParams.innerHTML = html;
-    
-    // Add event listeners for param inputs
-    attachVulnParamListeners();
-  }
-
-  function updateVulnFormulaDisplay() {
-    const method = vulnState.method;
-    const params = vulnState.params[method];
-    const methodInfo = normMethods[method];
-    
-    const formulaEl = document.getElementById("vulnParamFormula");
-    const exampleEl = document.getElementById("vulnParamExample");
-    
-    if (formulaEl) formulaEl.textContent = `Formula: ${methodInfo.formula(params)}`;
-    if (exampleEl) exampleEl.textContent = `Example: ${methodInfo.examples(params)}`;
-  }
-
-  function attachVulnParamListeners() {
-    const method = vulnState.method;
-    
-    if (method === "exponential") {
-      const inp = document.getElementById("vulnParamDecay");
-      if (inp) inp.addEventListener("input", () => {
-        vulnState.params.exponential.decay = Number(inp.value) || 0.7;
-        updateVulnFormulaDisplay();
-        recomputeVuln();
-      });
-    } else if (method === "linear") {
-      const inp = document.getElementById("vulnParamThreshold");
-      if (inp) inp.addEventListener("input", () => {
-        vulnState.params.linear.threshold = Number(inp.value) || 10;
-        updateVulnFormulaDisplay();
-        recomputeVuln();
-      });
-    } else if (method === "inverse") {
-      const inp = document.getElementById("vulnParamK");
-      if (inp) inp.addEventListener("input", () => {
-        vulnState.params.inverse.k = Number(inp.value) || 1;
-        updateVulnFormulaDisplay();
-        recomputeVuln();
-      });
-    } else if (method === "logarithmic") {
-      const inp = document.getElementById("vulnParamMax");
-      if (inp) inp.addEventListener("input", () => {
-        vulnState.params.logarithmic.maxExpected = Number(inp.value) || 20;
-        updateVulnFormulaDisplay();
-        recomputeVuln();
-      });
-    } else if (method === "sigmoid") {
-      const mid = document.getElementById("vulnParamMidpoint");
-      const steep = document.getElementById("vulnParamSteepness");
-      if (mid) mid.addEventListener("input", () => {
-        vulnState.params.sigmoid.midpoint = Number(mid.value) || 5;
-        updateVulnFormulaDisplay();
-        recomputeVuln();
-      });
-      if (steep) steep.addEventListener("input", () => {
-        vulnState.params.sigmoid.steepness = Number(steep.value) || 1;
-        updateVulnFormulaDisplay();
-        recomputeVuln();
-      });
-    }
+    renderMethodParams(vulnMethodConfig);
   }
 
   // ---------- Render Vuln Table ----------
@@ -3271,11 +3280,7 @@ CALCULATION
   }
 
   // ---------- Vuln Events ----------
-  vulnEl.method.addEventListener("change", () => {
-    vulnState.method = vulnEl.method.value;
-    renderVulnMethodParams();
-    recomputeVuln();
-  });
+  setupMethodChangeHandler(vulnMethodConfig);
   
   vulnEl.wCritical.addEventListener("input", recomputeVuln);
   vulnEl.wHigh.addEventListener("input", recomputeVuln);
