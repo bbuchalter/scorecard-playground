@@ -9,7 +9,7 @@
   //   - index.html
   //   - data-editor.html
   // ==========================================
-  const CACHE_VERSION = '1.0.3';
+  const CACHE_VERSION = '1.0.4';
   
   const VERSION_KEY = 'scorecard-cache-version';
   

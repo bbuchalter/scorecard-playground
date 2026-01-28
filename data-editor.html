@@ -7,11 +7,11 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>Mock Data Editor - Company Scorecard</title>
-  <script src="cache-version.js?v=1.0.3"></script>
-  <script src="team-navigation.js?v=1.0.3"></script>
-  <script src="scorecard-config.js?v=1.0.3"></script>
-  <script src="scorecard-compute.js?v=1.0.3"></script>
-  <script src="mock-data.js?v=1.0.3"></script>
+  <script src="cache-version.js?v=1.0.4"></script>
+  <script src="team-navigation.js?v=1.0.4"></script>
+  <script src="scorecard-config.js?v=1.0.4"></script>
+  <script src="scorecard-compute.js?v=1.0.4"></script>
+  <script src="mock-data.js?v=1.0.4"></script>
   <style>
     :root {
       --bg: #0b1020;
@@ -336,6 +336,19 @@
       </div>
     </div>
 
+    <!-- Data Management -->
+    <div class="team-selector-panel">
+      <h2>Data Management</h2>
+      <div class="selector-row">
+        <div class="actions-row">
+          <button class="btn" id="exportAllBtn">📥 Export All Data</button>
+          <button class="btn" id="importAllBtn">📤 Import All Data</button>
+          <button class="btn danger" id="resetAllBtn">🔄 Reset All Data</button>
+          <input type="file" id="importFileInput" accept=".json" style="display: none;" />
+        </div>
+      </div>
+    </div>
+
     <!-- Team Selector -->
     <div class="team-selector-panel">
       <h2>Select Team</h2>
@@ -346,9 +359,7 @@
           </select>
         </label>
         <div class="actions-row">
-          <button class="btn success" id="saveBtn">💾 Save Changes</button>
           <button class="btn secondary" id="generateBtn">🎲 Generate Random</button>
-          <button class="btn danger" id="resetAllBtn">🔄 Reset All Data</button>
         </div>
       </div>
     </div>
@@ -479,7 +490,6 @@
 
   // DOM elements
   const teamSelectorEl = document.getElementById('teamSelector');
-  const saveBtn = document.getElementById('saveBtn');
   const generateBtn = document.getElementById('generateBtn');
   const resetAllBtn = document.getElementById('resetAllBtn');
 
@@ -832,6 +842,11 @@
     document.getElementById('previewTotal').textContent = Math.round(totalScore);
     document.getElementById('previewTotal').className = 'preview-score ' + getColorClass(totalScore, totalMax);
     document.getElementById('previewTotalMax').textContent = Math.round(totalMax);
+
+    // Auto-save changes
+    if (currentTeamPath) {
+      MockData.updateMockDataForTeam(currentTeamPath, currentTeamData);
+    }
   }
 
   // ========== RENDER ALL ==========
@@ -843,13 +858,6 @@
   }
 
   // ========== ACTIONS ==========
-  saveBtn.addEventListener('click', () => {
-    if (currentTeamPath) {
-      MockData.updateMockDataForTeam(currentTeamPath, currentTeamData);
-      alert('✓ Changes saved successfully!');
-    }
-  });
-
   generateBtn.addEventListener('click', () => {
     if (currentTeamPath && confirm('Generate random data for this team? Current data will be replaced.')) {
       const targetScore = 60 + Math.floor(Math.random() * 30); // 60-90
@@ -865,6 +873,52 @@
       loadTeamData();
       alert('✓ All mock data has been reset to defaults.');
     }
+  });
+
+  // Export all mock data as JSON
+  document.getElementById('exportAllBtn').addEventListener('click', () => {
+    const allData = MockData.loadMockData();
+    const jsonStr = JSON.stringify(allData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'scorecard-all-mock-data.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // Import all mock data from JSON file
+  const importFileInput = document.getElementById('importFileInput');
+  
+  document.getElementById('importAllBtn').addEventListener('click', () => {
+    importFileInput.click();
+  });
+
+  importFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        if (confirm('Import this data? ALL current mock data will be replaced.')) {
+          MockData.saveMockData(data);
+          loadTeamData();
+          alert('✓ All mock data imported successfully!');
+        }
+      } catch (err) {
+        alert('Error parsing JSON file: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset input so same file can be selected again
+    importFileInput.value = '';
   });
 
   // ========== INITIALIZATION ==========
