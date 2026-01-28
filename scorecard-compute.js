@@ -213,7 +213,7 @@ function getLetterGrade(score) {
   if (score >= 90) return 'A';
   if (score >= 80) return 'B';
   if (score >= 70) return 'C';
-  if (score >= 60) return 'D';
+  if (score >= 61) return 'D';
   return 'F';
 }
 
@@ -224,7 +224,7 @@ function getScoreClass(score) {
   if (score >= 90) return 'excellent';
   if (score >= 80) return 'good';
   if (score >= 70) return 'fair';
-  if (score >= 60) return 'at-risk';
+  if (score >= 61) return 'at-risk';
   return 'critical';
 }
 
@@ -236,7 +236,7 @@ function getScoreClassSimple(value) {
   // Convert percentage to score if needed
   const score = value <= 1 ? value * 100 : value;
   if (score >= 80) return 'good';
-  if (score >= 60) return 'warn';
+  if (score >= 61) return 'warn';
   return 'bad';
 }
 

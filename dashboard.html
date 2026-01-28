@@ -1593,13 +1593,13 @@
   const calculateAverageTrend = OrgTree.calculateAverageTrend;
 
   /**
-   * Get failing teams (score < 60) in the subtree of a node
+   * Get failing teams (score <= 60, i.e. grade F) in the subtree of a node
    * @param {OrgNode} node - The node to get failing teams from
    * @returns {Array<OrgNode>} - Array of failing leaf nodes
    */
   function getFailingTeams(node) {
     const leafNodes = OrgTree.getAllLeafNodes(node);
-    return leafNodes.filter(leaf => calculateAverageScore(leaf) < 60);
+    return leafNodes.filter(leaf => calculateAverageScore(leaf) <= 60);
   }
 
   /**
@@ -1891,11 +1891,11 @@
                         </div>
                         <div class="grade-tooltip-row">
                           <span class="grade-tooltip-letter grade-d">D</span>
-                          <span class="grade-tooltip-range">60 – 69</span>
+                          <span class="grade-tooltip-range">61 – 69</span>
                         </div>
                         <div class="grade-tooltip-row">
                           <span class="grade-tooltip-letter grade-f">F</span>
-                          <span class="grade-tooltip-range">0 – 59</span>
+                          <span class="grade-tooltip-range">0 – 60</span>
                         </div>
                       </div>
                     </div>
