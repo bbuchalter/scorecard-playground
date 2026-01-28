@@ -933,6 +933,96 @@
       flex: 1;
       min-height: 120px;
     }
+
+    /* Failing teams sub-row in table */
+    .failing-teams-row {
+      background: rgba(251, 113, 133, 0.04) !important;
+    }
+
+    .failing-teams-row:hover {
+      background: rgba(251, 113, 133, 0.08) !important;
+    }
+
+    .failing-teams-row td {
+      padding: 10px 20px 10px 120px !important;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .failing-team-row-content {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      position: relative;
+      cursor: pointer;
+      padding: 2px 8px;
+      margin: -2px -8px;
+      border-radius: 4px;
+      transition: background 0.15s;
+    }
+
+    .failing-team-row-content:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .failing-team-row-content::before {
+      content: '';
+      position: absolute;
+      left: -40px;
+      top: 50%;
+      width: 30px;
+      height: 1px;
+      background: rgba(251, 113, 133, 0.3);
+    }
+
+    .failing-team-row-content::after {
+      content: '';
+      position: absolute;
+      left: -40px;
+      top: -14px;
+      width: 1px;
+      height: calc(50% + 14px);
+      background: rgba(251, 113, 133, 0.3);
+    }
+
+    /* Last failing team row - shorter vertical line */
+    .failing-teams-row:last-of-type .failing-team-row-content::after,
+    .failing-teams-row.last-failing .failing-team-row-content::after {
+      height: calc(50% + 14px);
+    }
+
+    .failing-team-row-content .mini-grade-badge {
+      font-size: 11px;
+      font-weight: 700;
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: rgba(251, 113, 133, 0.18);
+      color: var(--critical);
+      border: 1px solid rgba(251, 113, 133, 0.3);
+    }
+
+    .failing-team-path {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .failing-team-row-content:hover .path-leaf {
+      color: var(--critical);
+    }
+
+    .failing-team-path .path-separator {
+      margin: 0 4px;
+      color: rgba(169, 180, 214, 0.4);
+    }
+
+    .failing-team-path .path-leaf {
+      color: var(--text);
+      font-weight: 500;
+    }
   </style>
 </head>
 <body>
@@ -1502,6 +1592,76 @@
   const calculateAverageScore = OrgTree.calculateAverageScore;
   const calculateAverageTrend = OrgTree.calculateAverageTrend;
 
+  /**
+   * Get failing teams (score < 60) in the subtree of a node
+   * @param {OrgNode} node - The node to get failing teams from
+   * @returns {Array<OrgNode>} - Array of failing leaf nodes
+   */
+  function getFailingTeams(node) {
+    const leafNodes = OrgTree.getAllLeafNodes(node);
+    return leafNodes.filter(leaf => calculateAverageScore(leaf) < 60);
+  }
+
+  /**
+   * Render a team path as breadcrumb-style HTML including the parent node
+   * @param {Array<string>} teamPath - The full path of the failing team
+   * @param {OrgNode} parentNode - The parent node being viewed in the table row
+   * @returns {string} - HTML with breadcrumb formatting
+   */
+  function renderFullTeamPath(teamPath, parentNode) {
+    // Start with the parent node name, then add path segments below it
+    const parentName = parentNode.name;
+    const relativePath = teamPath.slice(parentNode.path.length);
+    
+    // Build full display path: parent name + relative segments
+    const fullPath = [parentName, ...relativePath];
+    
+    if (fullPath.length === 1) {
+      return `<span class="path-leaf">${escapeHtml(fullPath[0])}</span>`;
+    }
+    
+    // All parts except last are muted, last is highlighted
+    const pathParts = fullPath.slice(0, -1).map(p => escapeHtml(p));
+    const leafPart = escapeHtml(fullPath[fullPath.length - 1]);
+    
+    return `${pathParts.join('<span class="path-separator">›</span>')}<span class="path-separator">›</span><span class="path-leaf">${leafPart}</span>`;
+  }
+
+  /**
+   * Render failing teams sub-rows, one row per failing team
+   * @param {OrgNode} node - The child node in the table
+   * @returns {string} - HTML string for the sub-rows (empty if no failing teams or leaf node)
+   */
+  function renderFailingTeamsSubRows(node) {
+    // Leaf nodes have no teams below them
+    if (node.isLeaf) {
+      return '';
+    }
+    
+    const failingTeams = getFailingTeams(node);
+    if (failingTeams.length === 0) {
+      return '';
+    }
+    
+    // Build individual rows for each failing team
+    return failingTeams.map((team, index) => {
+      const fullPath = renderFullTeamPath(team.path, node);
+      const teamPathJson = JSON.stringify(team.path);
+      const isLast = index === failingTeams.length - 1;
+      
+      return `
+        <tr class="failing-teams-row${isLast ? ' last-failing' : ''}" onclick='navigateTo(${teamPathJson.replace(/'/g, "\\'")})'>
+          <td colspan="5">
+            <div class="failing-team-row-content">
+              <span class="mini-grade-badge">F</span>
+              <span class="failing-team-path">${fullPath}</span>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
   // ========== HELPER FUNCTIONS ==========
   function escapeHtml(text) {
     const div = document.createElement('div');
@@ -1854,6 +2014,7 @@
             </div>
           </td>
         </tr>
+        ${renderFailingTeamsSubRows(child)}
       `;
     });
 
