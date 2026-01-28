@@ -1,15 +1,13 @@
 // Cache Version Module
 // Manages localStorage cache invalidation based on version bumps
+// Also handles versioned script loading - bump CACHE_VERSION to bust all caches
 
 (function() {
   // ==========================================
-  // BUMP THIS VERSION TO CLEAR USER CACHES
-  // Also update ?v= query strings in HTML files:
-  //   - dashboard.html
-  //   - index.html
-  //   - data-editor.html
+  // BUMP THIS VERSION TO CLEAR ALL CACHES
+  // (localStorage AND browser script caches)
   // ==========================================
-  const CACHE_VERSION = '1.0.4';
+  const CACHE_VERSION = '1.0.5';
   
   const VERSION_KEY = 'scorecard-cache-version';
   
@@ -76,6 +74,17 @@
     }
   }
 
+  /**
+   * Load scripts with the current cache version appended as query string.
+   * Uses document.write for synchronous loading during page parse.
+   * @param {string[]} scripts - Array of script paths to load
+   */
+  function loadScripts(scripts) {
+    scripts.forEach(src => {
+      document.write(`<script src="${src}?v=${CACHE_VERSION}"><\/script>`);
+    });
+  }
+
   // Run cache check immediately when script loads
   checkAndInvalidateCache();
 
@@ -86,7 +95,8 @@
       checkAndInvalidateCache,
       clearCache,
       getVersion,
-      getStoredVersion
+      getStoredVersion,
+      loadScripts
     };
   }
 
@@ -97,7 +107,8 @@
       checkAndInvalidateCache,
       clearCache,
       getVersion,
-      getStoredVersion
+      getStoredVersion,
+      loadScripts
     };
   }
 })();

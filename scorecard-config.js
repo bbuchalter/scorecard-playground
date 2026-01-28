@@ -73,7 +73,7 @@ const normMethods = {
 // Default configuration
 const defaultConfig = () => ({
   slo: {
-    pointBudget: 30,
+    pointBudget: 35,
     tierWeights: { p0: 2.0, p1: 1.0, p2: 0.5 },
     method: "exponential",
     params: {
@@ -112,7 +112,7 @@ const defaultConfig = () => ({
     }
   },
   pm: {
-    budget: 15,
+    budget: 10,
     severityWeights: { sev1: 4.0, sev2: 2.0, sev3: 1.0, sev4: 0.5 },
     typeWeights: { postmortem: 3.0, actions: 2.0, metadata: 1.0 },
     method: "exponential",
