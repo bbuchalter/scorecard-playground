@@ -1465,17 +1465,6 @@
         labels: ['Q-3', 'Q-2', 'Q-1', 'Current'],
         datasets: [
           {
-            label: 'SLOs',
-            data: metrics.slos.trend,
-            borderColor: '#93c5fd',
-            backgroundColor: 'rgba(147, 197, 253, 0.1)',
-            borderWidth: 2,
-            pointRadius: 4,
-            pointBackgroundColor: '#93c5fd',
-            pointBorderColor: '#93c5fd',
-            tension: 0.3
-          },
-          {
             label: 'Vulns',
             data: metrics.vulns.trend,
             borderColor: '#fb7185',
@@ -1484,6 +1473,17 @@
             pointRadius: 4,
             pointBackgroundColor: '#fb7185',
             pointBorderColor: '#fb7185',
+            tension: 0.3
+          },
+          {
+            label: 'SLOs',
+            data: metrics.slos.trend,
+            borderColor: '#93c5fd',
+            backgroundColor: 'rgba(147, 197, 253, 0.1)',
+            borderWidth: 2,
+            pointRadius: 4,
+            pointBackgroundColor: '#93c5fd',
+            pointBorderColor: '#93c5fd',
             tension: 0.3
           },
           {
@@ -1731,8 +1731,8 @@
     };
 
     const metricConfigs = [
-      { key: 'slos', name: 'SLOs', dotClass: 'slos' },
       { key: 'vulns', name: 'Vulns', dotClass: 'vulns' },
+      { key: 'slos', name: 'SLOs', dotClass: 'slos' },
       { key: 'bugs', name: 'Bugs', dotClass: 'bugs' },
       { key: 'postmortems', name: 'Postmortems', dotClass: 'postmortems' }
     ];
@@ -1949,8 +1949,8 @@
           <thead>
             <tr>
               <th>${childLabel}</th>
-              <th>SLOs</th>
               <th>Vulns</th>
+              <th>SLOs</th>
               <th>Bugs</th>
               <th>Postmortems</th>
             </tr>
@@ -1983,17 +1983,17 @@
           </td>
           <td class="metric-cell">
             <div class="metric-content">
-              <div class="score-badge ${getScoreClass(child.metrics.slos.score)}">${child.metrics.slos.score}</div>
+              <div class="score-badge ${getScoreClass(child.metrics.vulns.score)}">${child.metrics.vulns.score}</div>
               <div class="sparkline-container">
-                <canvas id="chart-${safeId}-slos"></canvas>
+                <canvas id="chart-${safeId}-vulns"></canvas>
               </div>
             </div>
           </td>
           <td class="metric-cell">
             <div class="metric-content">
-              <div class="score-badge ${getScoreClass(child.metrics.vulns.score)}">${child.metrics.vulns.score}</div>
+              <div class="score-badge ${getScoreClass(child.metrics.slos.score)}">${child.metrics.slos.score}</div>
               <div class="sparkline-container">
-                <canvas id="chart-${safeId}-vulns"></canvas>
+                <canvas id="chart-${safeId}-slos"></canvas>
               </div>
             </div>
           </td>
